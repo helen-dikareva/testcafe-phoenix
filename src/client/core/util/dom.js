@@ -4,6 +4,7 @@ import $ from '../deps/jquery';
 
 var browserUtils = hammerheadAPI.Util.Browser;
 var hhDomUtils   = hammerheadAPI.Util.DOM;
+var hhTypesUtils = hammerheadAPI.Util.Types;
 
 
 export function getTextareaIndentInLine (textarea, position) {
@@ -336,7 +337,6 @@ export var getSelectParent                            = hhDomUtils.getSelectPare
 export var getSelectVisibleChildren                   = hhDomUtils.getSelectVisibleChildren;
 export var isContentEditableElement                   = hhDomUtils.isContentEditableElement;
 export var isCrossDomainWindows                       = hhDomUtils.isCrossDomainWindows;
-export var isDocumentInstance                         = hhDomUtils.isDocumentInstance;
 export var isDomElement                               = hhDomUtils.isDomElement;
 export var isElementInIframe                          = hhDomUtils.isElementInIframe;
 export var isFileInput                                = hhDomUtils.isFileInput;
@@ -350,3 +350,5 @@ export var isTextEditableElementAndEditingAllowed     = hhDomUtils.isTextEditabl
 export var isTextEditableInput                        = hhDomUtils.isTextEditableInput;
 export var isTextNode                                 = hhDomUtils.isTextNode;
 export var isWindowInstance                           = hhDomUtils.isWindowInstance;
+
+export var isDocumentInstance = hhTypesUtils.isDocument;

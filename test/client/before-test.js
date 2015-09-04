@@ -22,8 +22,7 @@
     var jsProcessor = hammerhead.get('../processing/js/index');
 
     hhSettings.set({
-        JOB_OWNER_TOKEN: 'ownerToken',
-        JOB_UID:         'jobUid'
+        SESSION_ID: 'sessionId'
     });
 
     hhUrlUtil.OriginLocation.get = function () {
@@ -35,10 +34,9 @@
             e.iframe.contentWindow.eval.call(e.iframe.contentWindow, [
                 'var Settings = Hammerhead.get(\'./settings\');',
                 'Settings.set({',
-                '    REFERER : "http://localhost/ownerToken!jobUid/https://example.com",',
-                '    JOB_OWNER_TOKEN : "ownerToken",',
+                '    REFERER : "http://localhost/sessionId/https://example.com",',
                 '    SERVICE_MSG_URL : "/service-msg/100",',
-                '    JOB_UID : "jobUid"',
+                '    SESSION_ID : "sessionId"',
                 '});',
                 'Hammerhead.init();'
             ].join(''));

@@ -21,7 +21,7 @@ var CLIENT_TESTS_SETTINGS = {
 
     scripts: [
         { src: '/async.js', path: './test/client/vendor/async.js' },
-        { src: '/hammerhead.js', path: './node_modules/hammerhead/client/hammerhead.js' },
+        { src: '/hammerhead.js', path: './node_modules/hammerhead/lib/client/hammerhead.js' },
         { src: '/core.js', path: './lib/client/core/index.js' },
         { src: '/ui.js', path: './lib/client/ui/index.js' },
         { src: '/runner.js', path: './lib/client/runner/index.js' },

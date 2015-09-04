@@ -125,15 +125,15 @@ $(document).ready(function () {
 
         var action = function (callback) {
             $.get('/xhr-test/100', function (url) {
-                strictEqual(url, '/ownerToken!jobUid/https://example.com/xhr-test/100');
+                strictEqual(url, '/sessionId/https://example.com/xhr-test/100');
             });
 
             $.get('http://' + window.location.host + '/xhr-test/200', function (url) {
-                strictEqual(url, '/ownerToken!jobUid/https://example.com/xhr-test/200');
+                strictEqual(url, '/sessionId/https://example.com/xhr-test/200');
             });
 
             $.get('https://example.com/xhr-test/300', function (url) {
-                strictEqual(url, '/ownerToken!jobUid/https://example.com/xhr-test/300');
+                strictEqual(url, '/sessionId/https://example.com/xhr-test/300');
             });
             callback();
         };
