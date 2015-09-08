@@ -71,7 +71,7 @@ exports.run = function (requireFilename, ownerFilename, sourceIndex, callback) {
         }
 
         if (!errs.length)
-            descriptor.jsCode = Hammerhead.wrapDomAccessors(descriptor.jsCode, true);
+            descriptor.jsCode = Hammerhead.jsProcessor.process(descriptor.jsCode, true);
 
         //NOTE: User can forget ';' at the end of the require js file. In this case, an js exception may occure after
         //requires merging. So we add ';' at the end of the require code manually
