@@ -77,16 +77,16 @@ export default class Bootstrapper {
         var browsers           = await Promise.all(this.browsers.map(Bootstrapper._convertBrowserAliasToBrowserInfo));
         var browserConnections = browsers.map(browser => this._createConnectionFromBrowserInfo(browser));
 
-        try {
-            await Bootstrapper._waitBrowserConnectionsReady(browserConnections);
-        }
-        finally {
+        //try {
+        await Bootstrapper._waitBrowserConnectionsReady(browserConnections);
+        //}
+        /*finally {
             // NOTE: we should close local connections and related browsers once we've done
             browserConnections.forEach(bc => {
                 if (bc instanceof LocalBrowserConnection)
                     bc.close();
             });
-        }
+        }*/
 
         return browserConnections;
     }

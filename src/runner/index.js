@@ -35,7 +35,7 @@ export default class Runner {
     _runTask (Reporter, browserConnections, tests) {
         return new Promise((resolve, reject) => {
             var task     = new Task(tests, browserConnections, this.proxy, this.opts);
-            var reporter = new Reporter(task, this.opts.reportOutStream, this.opts.formatter);
+            var reporter = new Reporter(task, this.opts.reportOutStream || void 0, this.opts.formatter || void 0);
 
             var bcErrorHandler = msg => {
                 task.abort();

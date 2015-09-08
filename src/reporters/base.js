@@ -108,8 +108,9 @@ export default class BaseReporter {
         });
 
         task.on('test-run-done', (testRun) => {
-            var reportItem      = this._getReportItemForTestRun(testRun);
-            var userAgent       = testRun.browserConnection.userAgent;
+            var reportItem = this._getReportItemForTestRun(testRun);
+            var userAgent  = testRun.browserConnection.userAgent;
+
             var testRunErrMsgs  = testRun.errs.map(err => this.formatter(err, userAgent));
 
             reportItem.pendingRuns--;
@@ -150,7 +151,8 @@ export default class BaseReporter {
         if (text)
             this._write(text);
 
-        this.outStream.end('');
+        if (this.outStream !== process.stdout)
+            this.outStream.end('');
     }
 
 
