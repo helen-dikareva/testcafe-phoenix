@@ -1,6 +1,6 @@
 import RunnerBase from './runner-base';
 import Runner from './runner';
-import iframeDispatcher from './iframe-dispatcher';
+import * as iframeDispatcher from './iframe-dispatcher';
 
 exports.Runner           = Runner;
 exports.RunnerBase       = RunnerBase;

@@ -164,7 +164,7 @@ var RunnerBase = function () {
 
             runner.stepIterator.start(stepNames, testSteps, dialogsAPI.resetHandlers,
                 dialogsAPI.checkExpectedDialogs, nextStep);
-        }, skipPageWaiting);
+        }, skipPageWaiting, !nextStep);
     };
 };
 
@@ -305,7 +305,7 @@ RunnerBase.prototype._initIFrameBehavior = function () {
     };
 };
 
-RunnerBase.prototype._prepareStepsExecuting = function (callback, skipPageWaiting) {
+RunnerBase.prototype._prepareStepsExecuting = function (callback, skipPageWaiting, isFirstStep) {
     function runCallback () {
         cursor.init();
         callback();
@@ -324,7 +324,7 @@ RunnerBase.prototype._prepareStepsExecuting = function (callback, skipPageWaitin
 
                         callback();
                     });
-                });
+                }, isFirstStep);
             }, ANIMATIONS_WAIT_DELAY);
         });
     }
