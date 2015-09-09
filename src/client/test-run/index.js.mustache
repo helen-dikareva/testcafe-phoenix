@@ -47,16 +47,11 @@
             NATIVE_DIALOGS_INFO:      {{{nativeDialogsInfo}}}
         });
 
-        /*var IFRAME_TEST_RUNNNER_TASK_SCRIPT = '{{{iFrameTestRunScript}}}';
-
         hammerhead.on(hammerhead.IFRAME_READY_TO_INIT, function (e) {
             var iframeWindow = e.iframe.contentWindow;
 
-            initTestCafeClientCore(iframeWindow, true);
-            initTestCafeUI(iframeWindow);
-
-            iframeWindow.eval.apply(iframeWindow, ['var isIFrameWithoutSrc = true;' + IFRAME_TEST_RUNNNER_TASK_SCRIPT]);
-        });*/
+            iframeWindow.eval.apply(iframeWindow, ['var isIFrameWithoutSrc = true;' + {{{iFrameTestRunScript}}}]);
+        });
 
         var transport                = testCafeCore.transport;
         var sandboxedJQuery          = testCafeCore.sandboxedJQuery;

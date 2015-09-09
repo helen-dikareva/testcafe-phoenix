@@ -1,3 +1,5 @@
+import * as hammerheadAPI from './deps/hammerhead';
+
 import $ from './deps/jquery';
 import * as SETTINGS from './settings';
 import ERROR_TYPE from '../../test-error/type';
@@ -46,3 +48,5 @@ Object.defineProperty(window, '%testCafeCore%', {
     writable:     false,
     value:        exports
 });
+
+hammerheadAPI.on(hammerheadAPI.IFRAME_READY_TO_INIT, e => initTestCafeCore(e.iframe.contentWindow, true));
