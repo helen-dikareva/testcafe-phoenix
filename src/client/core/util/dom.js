@@ -349,6 +349,6 @@ export var isTextEditableElement                      = hhDomUtils.isTextEditabl
 export var isTextEditableElementAndEditingAllowed     = hhDomUtils.isTextEditableElementAndEditingAllowed;
 export var isTextEditableInput                        = hhDomUtils.isTextEditableInput;
 export var isTextNode                                 = hhDomUtils.isTextNode;
-export var isWindowInstance                           = hhDomUtils.isWindowInstance;
 
+export var isWindowInstance   = hhTypesUtils.isWindow;
 export var isDocumentInstance = hhTypesUtils.isDocument;
