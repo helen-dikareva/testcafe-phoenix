@@ -185,6 +185,7 @@ gulp.task('lint', function () {
             'src/**/*.js',
             '!src/client/**/*.js',  //TODO: fix it
             //'test/**/*.js',       //TODO: fix it
+            'test/functional/**/*.js',
             'Gulpfile.js'
         ])
         .pipe(eslint())
@@ -208,6 +209,26 @@ gulp.task('test-client', ['build'], function () {
     return gulp
         .src('./test/client/fixtures/**/*-test.js')
         .pipe(qunitHarness(CLIENT_TESTS_SETTINGS));
+});
+
+gulp.task('test-functional', ['build'], function () {
+    var functionalTestsSite = require('./test/functional/site');
+
+    functionalTestsSite.create(3000, 3001, './test/functional');
+
+    return gulp
+        .src('test/functional/**/*-test.js')
+        .pipe(mocha({
+            ui:       'bdd',
+            reporter: 'min',
+            timeout:  typeof v8debug === 'undefined' ? 60000 : Infinity // NOTE: disable timeouts in debug
+        }))
+        .once('error', function () {
+            functionalTestsSite.destroy();
+        })
+        .once('end', function () {
+            functionalTestsSite.destroy();
+        });
 });
 
 gulp.task('test', ['lint', 'test-server']);
