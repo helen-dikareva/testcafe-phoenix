@@ -337,6 +337,20 @@
     }
 };
 
+'@test'['SHOULD FAIL: when the first argument is empty'] = {
+    '1.Click on an nonexistent element': function () {
+        act.click('#nonexistentElement');
+    }
+};
+
+'@test'['SHOULD FAIL: when the first argument is invisible'] = {
+    '1.Click on an nonexistent element': function () {
+        var $input = $('#input').css('visibility', 'hidden');
+
+        act.click($input);
+    }
+};
+
 //utils
 function checkThatElementClicked ($el) {
     eq(eventTracker.getCount($el, 'click'), 1, 'element clicked');

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Action drag</title>
+    <script type="text/javascript" src="/jquery"></script>
+    <style>
+        .draggable, .dragGlobal {
+            width: 100px;
+            height: 100px;
+            position: absolute;
+            background-color: grey;
+            z-index: 5;
+        }
+
+        .target {
+            width: 120px;
+            height: 120px;
+            position: absolute;
+            background-color: red;
+        }
+    </style>
+</head>
+<body style="height: 1500px;">
+<div id="drag" class="draggable" style="left:0; top:0;"></div>
+<div id="drag1" class="draggable" style="left:100px; top:300px;"></div>
+<div id="target" class="target" style="left:100px; top:100px;"></div>
+<div id="target1" class="target" style="left:220px; top:220px;"></div>
+
+<div id="drag2" class="dragGlobal" style="left:0; top:0; display: none;"></div>
+<script>
+    var hasTouchEvents = !!('ontouchstart' in window);
+
+    function offsetToClientCoords(coords) {
+        return {
+            x: coords.x - $(window).scrollLeft(),
+            y: coords.y - $(window).scrollTop()
+        };
+    }
+
+    function getValueFromPx(px) {
+        return parseInt(px.replace('px', ''));
+    }
+
+    function createDraggable($el, withGloballCoord) {
+        var startPos = 0;
+        var startMousePos = 0;
+
+        $el.bind(hasTouchEvents ? 'touchstart' : 'mousedown', function (e) {
+            var startMouseClientPosition = offsetToClientCoords({
+                x: e.pageX,
+                y: e.pageY
+            });
+
+            startPos = {
+                x: getValueFromPx($el.css('left')),
+                y: getValueFromPx($el.css('top'))
+            };
+            startMousePos = hasTouchEvents ? {
+                x: e.originalEvent.targetTouches[0].pageX || e.originalEvent.touches[0].pageX,
+                y: e.originalEvent.targetTouches[0].pageY || e.originalEvent.touches[0].pageY
+            } : {
+                x: withGloballCoord ? startMouseClientPosition.x : e.clientX,
+                y: withGloballCoord ? startMouseClientPosition.y : e.clientY
+            };
+            $(this).data('dragStarted', true);
+        });
+
+        $el.bind(hasTouchEvents ? 'touchend' : 'mouseup', function () {
+            $(this).data('dragStarted', false);
+        });
+
+        $(document).bind(hasTouchEvents ? 'touchmove' : 'mousemove', function (e) {
+            var startMouseClientPosition = offsetToClientCoords({
+                x: e.pageX,
+                y: e.pageY
+            });
+
+            var curMousePos = hasTouchEvents ? {
+                x: e.originalEvent.targetTouches[0].pageX || e.originalEvent.touches[0].pageX,
+                y: e.originalEvent.targetTouches[0].pageY || e.originalEvent.touches[0].pageY
+            } : {
+                x: withGloballCoord ? startMouseClientPosition.x : e.clientX,
+                y: withGloballCoord ? startMouseClientPosition.y : e.clientY
+            };
+
+            $.each($el, function () {
+                if ($(this).data('dragStarted')) {
+                    $(this).css({
+                        left: (curMousePos.x - 50 + (!withGloballCoord ? $(window).scrollLeft() : 0)) + 'px',
+                        top: (curMousePos.y - 50 + (!withGloballCoord ? $(window).scrollTop() : 0)) + 'px'
+                    });
+                }
+            });
+        });
+    }
+
+    createDraggable($('.draggable'));
+    createDraggable($('.dragGlobal'), true);
+</script>
+</body>
+</html>
