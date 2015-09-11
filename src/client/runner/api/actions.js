@@ -1,3 +1,4 @@
+import COMPILER_CONST from '../../../compiler/old/const';
 import * as hammerheadAPI from '../deps/hammerhead';
 import testCafeCore from '../deps/testcafe-core';
 import * as automation from '../automation/automation';
@@ -17,7 +18,6 @@ var hhUpload    = hammerheadAPI.upload;
 
 var $               = testCafeCore.$;
 var SETTINGS        = testCafeCore.SETTINGS;
-var CONST           = testCafeCore.CONST;
 var ERROR_TYPE      = testCafeCore.ERROR_TYPE;
 var contentEditable = testCafeCore.contentEditable;
 var domUtils        = testCafeCore.domUtils;
@@ -718,4 +718,4 @@ export function setElementAvailabilityWaitingTimeout (ms) {
 }
 
 //NOTE: add sourceIndex wrapper
-sourceIndexTracker.wrapTrackableMethods(exports, CONST.ACTION_FUNC_NAMES);
+sourceIndexTracker.wrapTrackableMethods(exports, COMPILER_CONST.ACTION_FUNC_NAMES);

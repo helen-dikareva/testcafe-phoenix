@@ -1,5 +1,4 @@
 import { Proxy } from 'hammerhead';
-import Mustache from 'mustache';
 import BrowserConnectionGateway from './browser-connection/gateway';
 import BrowserConnection from './browser-connection';
 import Runner from './runner';
@@ -7,13 +6,9 @@ import read from './utils/read-file-relative';
 
 
 // Const
-const CORE_SCRIPT_TEMPLATE   = read('./client/templates/core.js.mustache');
-const RUNNER_SCRIPT_TEMPLATE = read('./client/templates/runner.js.mustache');
-const UI_SCRIPT_TEMPLATE     = read('./client/templates/ui.js.mustache');
-
-const CORE_SCRIPT   = Mustache.render(CORE_SCRIPT_TEMPLATE, { source: read('./client/core/index.js') });
-const RUNNER_SCRIPT = Mustache.render(RUNNER_SCRIPT_TEMPLATE, { source: read('./client/runner/index.js') });
-const UI_SCRIPT     = Mustache.render(UI_SCRIPT_TEMPLATE, { source: read('./client/ui/index.js') });
+const CORE_SCRIPT   = read('./client/core/index.js');
+const RUNNER_SCRIPT = read('./client/runner/index.js');
+const UI_SCRIPT     = read('./client/ui/index.js');
 const UI_STYLE      = read('./client/ui/styles.css');
 const UI_SPRITE     = read('./client/ui/sprite.png', true);
 
