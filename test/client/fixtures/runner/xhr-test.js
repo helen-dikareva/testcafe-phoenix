@@ -187,28 +187,6 @@ $(document).ready(function () {
         xhrBarrier.waitBarrier();
     });
 
-    asyncTest('B238528 - Unexpected text modifying during typing text in the search input on the http://www.google.co.uk', function () {
-        var timeout = 100;
-
-        xhrBarrier.init();
-
-        var ready = function () {
-            if (this.readyState === this.DONE) {
-                ok(syncActionExecuted);
-                start();
-            }
-        };
-
-        var syncActionExecuted = false,
-            xhr                = new XMLHttpRequest();
-
-        xhr.onreadystatechange = ready;
-        xhr.open('GET', '/xhr-test/' + timeout);
-        xhr.send(null);
-
-        syncActionExecuted = true;
-    });
-
     asyncTest('T135542 - act.wait method works too-o-o-o long', function () {
         var firstRequestCompleted  = false,
             secondRequestCompleted = false;

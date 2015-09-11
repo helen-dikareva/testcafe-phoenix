@@ -1,6 +1,6 @@
 var hammerhead    = window.getTestCafeModule('hammerhead');
 var browser       = hammerhead.Util.Browser;
-var iframeSandbox = hammerhead.get('./sandboxes/iframe');
+var iframeSandbox = hammerhead.sandbox.iframe;
 
 var testCafeCore  = window.getTestCafeModule('testCafeCore');
 var SETTINGS      = testCafeCore.get('./settings').get();
@@ -417,7 +417,7 @@ $(document).ready(function () {
                     $link.click(function () {
                         clicked = true;
                     });
-                    equal($iFrame[0].contentWindow.location.pathname, '/ownerToken!jobUid!iframe/https://example.com/test-resource/runner-iframe.html');
+                    equal($iFrame[0].contentWindow.location.pathname, '/sessionId!iframe/https://example.com/test-resource/runner-iframe.html');
                     $link.focus();
 
                     //NOTE: we need set timeout for waiting of focus in IE
@@ -429,7 +429,7 @@ $(document).ready(function () {
 
                 },
                 function () {
-                    equal($iFrame[0].contentWindow.location.pathname, '/ownerToken!jobUid/https://example.com/test-resource/focus-iframe.html');
+                    equal($iFrame[0].contentWindow.location.pathname, '/sessionId/https://example.com/test-resource/focus-iframe.html');
                     ok(clicked);
                 },
                 2000
@@ -452,7 +452,7 @@ $(document).ready(function () {
                     $link.click(function () {
                         clicked = true;
                     });
-                    equal($iFrame[0].contentWindow.location.pathname, '/ownerToken!jobUid!iframe/https://example.com/test-resource/runner-iframe.html');
+                    equal($iFrame[0].contentWindow.location.pathname, '/sessionId!iframe/https://example.com/test-resource/runner-iframe.html');
                     $link.focus();
 
                     //NOTE: we need set timeout for waiting of focus in IE
@@ -462,7 +462,7 @@ $(document).ready(function () {
                     }, 500);
                 },
                 function () {
-                    equal($iFrame[0].contentWindow.location.pathname, '/ownerToken!jobUid!iframe/https://example.com/test-resource/focus-iframe.html');
+                    equal($iFrame[0].contentWindow.location.pathname, '/sessionId!iframe/https://example.com/test-resource/focus-iframe.html');
                     ok(clicked);
                 },
                 2000

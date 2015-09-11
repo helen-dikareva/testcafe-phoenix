@@ -1,5 +1,5 @@
 var hammerhead    = window.getTestCafeModule('hammerhead');
-var iframeSandbox = hammerhead.get('./sandboxes/iframe');
+var iframeSandbox = hammerhead.sandbox.iframe;
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionBarrier  = testCafeRunner.get('./action-barrier/action-barrier');
