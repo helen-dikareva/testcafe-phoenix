@@ -33,8 +33,8 @@ export default class BrowserConnectionGateway {
         this._dispatch('/browser/idle/{id}', proxy, BrowserConnectionGateway.onIdle);
         this._dispatch('/browser/status/{id}', proxy, BrowserConnectionGateway.onStatusRequest);
 
-        proxy.GET('./browser/assets/index.js', { content: IDLE_PAGE_SCRIPT, contentType: 'application/x-javascript' });
-        proxy.GET('./browser/assets/style.css', { content: IDLE_PAGE_STYLE, contentType: 'text/css' });
+        proxy.GET('/browser/assets/index.js', { content: IDLE_PAGE_SCRIPT, contentType: 'application/x-javascript' });
+        proxy.GET('/browser/assets/style.css', { content: IDLE_PAGE_STYLE, contentType: 'text/css' });
     }
 
     // Helpers

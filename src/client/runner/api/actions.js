@@ -10,6 +10,7 @@ import rClickPlaybackAutomation from '../automation/playback/rclick';
 import selectPlaybackAutomation from '../automation/playback/select';
 import typePlaybackAutomation from '../automation/playback/type';
 import * as sourceIndexTracker from '../source-index';
+import async from '../deps/async';
 
 var jsProcessor = hammerheadAPI.JSProcessor;
 var hhUpload    = hammerheadAPI.upload;
@@ -180,7 +181,7 @@ function actionArgumentsIterator (actionName) {
             failWithError(ERROR_TYPE.emptyFirstArgument, { action: actionName });
         }
         else {
-            window.async.forEachSeries(
+            async.forEachSeries(
                 items,
                 function (item, seriaCallback) {
                     iterate(item, seriaCallback);

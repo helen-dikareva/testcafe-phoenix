@@ -14,5 +14,7 @@ export default {
     setTestError:                     'set-test-error',
     getAndUncheckFileDownloadingFlag: 'get-and-uncheck-file-downloading-flag',
     uncheckFileDownloadingFlag:       'uncheck-file-downloading-flag',
-    nativeDialogsInfoSet:             'native-dialogs-info-set'
+    nativeDialogsInfoSet:             'native-dialogs-info-set',
+    inactivityExpected:               'inactivity-expected',
+    takeScreenshot:                   'take-screenshot'
 };

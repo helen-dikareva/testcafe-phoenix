@@ -5,6 +5,7 @@ import COMMAND from '../../runner/test-run/command';
 import CROSS_DOMAIN_MESSAGES from './cross-domain-messages';
 import CONST from './const';
 import * as transport from './transport';
+import * as sandboxedJQuery from './sandboxed-jquery';
 import * as jQuerySelectorExtensions from './jquery-extensions/custom-selectors';
 import * as jQueryDataMethodProxy from './jquery-extensions/data-proxy';
 
@@ -26,6 +27,7 @@ exports.CONST                    = CONST;
 exports.jQuerySelectorExtensions = jQuerySelectorExtensions;
 exports.jQueryDataMethodProxy    = jQueryDataMethodProxy;
 exports.transport                = transport;
+exports.sandboxedJQuery          = sandboxedJQuery;
 
 exports.serviceUtils    = serviceUtils;
 exports.domUtils        = domUtils;
