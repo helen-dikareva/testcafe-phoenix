@@ -1,7 +1,7 @@
 import * as hammerheadAPI from './deps/hammerhead';
 
 import $ from './deps/jquery';
-import * as SETTINGS from './settings';
+import SETTINGS from './settings';
 import ERROR_TYPE from '../../test-error/type';
 import COMMAND from '../../runner/test-run/command';
 import CROSS_DOMAIN_MESSAGES from './cross-domain-messages';

@@ -221,7 +221,7 @@ gulp.task('test-functional', ['build'], function () {
         .pipe(mocha({
             ui:       'bdd',
             reporter: 'min',
-            timeout:  typeof v8debug === 'undefined' ? 60000 : Infinity // NOTE: disable timeouts in debug
+            timeout:  typeof v8debug === 'undefined' ? 120000 : Infinity // NOTE: disable timeouts in debug
         }))
         .once('error', function () {
             functionalTestsSite.destroy();

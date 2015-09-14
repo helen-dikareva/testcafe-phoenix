@@ -20,9 +20,8 @@ window.init = function (id, statusUrl) {
                         document.location = res.url;
                     }
 
-                    //TODO:
-                    /*if (res.cmd === COMMAND.close) {
-                    }*/
+                    if (res.cmd === COMMAND.close)
+                        document.title = '[' + document.location.toString() + ']';
                 }
             }
         };

@@ -1,5 +1,6 @@
-var TestCafe = require('../../../../../../lib/');
-var expect   = require('chai').expect;
+var TestCafe   = require('../../../../../../lib/');
+var ERROR_TYPE = require('../../../../../../lib/test-error/type');
+var expect     = require('chai').expect;
 
 
 describe('click api tests', function () {
@@ -25,7 +26,6 @@ describe('click api tests', function () {
     // Fixture setup/teardown
     before(function () {
         testCafe = new TestCafe(1335, 1336);
-        errors   = [];
     });
 
     after(function () {
@@ -35,6 +35,7 @@ describe('click api tests', function () {
 
     // Test setup/teardown
     beforeEach(function () {
+        errors   = [];
         runner = testCafe.createRunner();
         runner.browsers('chrome');
     });
@@ -69,7 +70,7 @@ describe('click api tests', function () {
             .then(function (passed) {
                 expect(passed).eql(false);
                 expect(errors.length).eql(1);
-                expect(errors[0].code).eql('CLIENT_API_EMPTY_FIRST_ARGUMENT');
+                expect(errors[0].code).eql(ERROR_TYPE.emptyFirstArgument);
             });
 
         run
@@ -90,7 +91,7 @@ describe('click api tests', function () {
             .then(function (passed) {
                 expect(passed).eql(false);
                 expect(errors.length).eql(1);
-                expect(errors[0].code).eql('CLIENT_API_INVISIBLE_ACTION_ELEMENT');
+                expect(errors[0].code).eql(ERROR_TYPE.invisibleActionElement);
             });
 
         run

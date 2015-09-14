@@ -30,13 +30,14 @@ export default class LocalBrowserConnection extends BrowserConnection {
 
     close () {
         this.forceClose = true;
-
-        super.close();
     }
 
     getStatus () {
         if (this.forceClose) {
-            setTimeout(() => closeBrowser(this.idleUrl), LocalBrowserConnection.NATIVE_ACTION_DELAY);
+            setTimeout(() => {
+                closeBrowser(this.idleUrl);
+                super.close();
+            }, LocalBrowserConnection.NATIVE_ACTION_DELAY);
 
             return { cmd: COMMAND.close };
         }
