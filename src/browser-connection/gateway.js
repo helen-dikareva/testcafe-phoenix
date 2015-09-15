@@ -47,6 +47,11 @@ export default class BrowserConnectionGateway {
         return true;
     }
 
+    static preventCaching (res) {
+        res.setHeader('cache-control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('pragma', 'no-cache');
+    }
+
 
     // Route handlers
     static onConnection (req, res, connection) {
@@ -69,14 +74,17 @@ export default class BrowserConnectionGateway {
     }
 
     static onIdle (req, res, connection) {
-        if (BrowserConnectionGateway.ensureConnectionReady(res, connection))
+        if (BrowserConnectionGateway.ensureConnectionReady(res, connection)) {
+            BrowserConnectionGateway.preventCaching(res);
             res.end(connection.renderIdlePage());
+        }
     }
 
     static onStatusRequest (req, res, connection) {
         if (BrowserConnectionGateway.ensureConnectionReady(res, connection)) {
             var status = connection.getStatus();
 
+            BrowserConnectionGateway.preventCaching(res);
             respondWithJSON(res, status);
         }
     }
