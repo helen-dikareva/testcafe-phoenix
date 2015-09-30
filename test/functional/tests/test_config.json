@@ -2,6 +2,8 @@
     "baseUrl": "http://localhost:3000",
     "modules": {
         "eventTracker": ["../helpers/event-tracker.js"],
-        "browser": ["../helpers/browser.js"]
+        "browser": ["../helpers/browser.js"],
+        "event": ["../helpers/event.js"],
+        "selection": ["../helpers/selection.js"]
     }
 }

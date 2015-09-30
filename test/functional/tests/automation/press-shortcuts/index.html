@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Press shortcuts</title>
+</head>
+<body style="height: 1500px;">
+<input type="text" id="inputText" value="text"/>
+<textarea id="textarea" style="height: 200px;">
+text
+area</textarea>
+
+<script type="text/javascript">
+    var input = document.getElementById('inputText');
+    var textarea = document.getElementById('textarea');
+
+    var nativeSetSelectionRange = input.setSelectionRange;
+
+    function overrideSetSelectionRange (el) {
+        el.setSelectionRange = function (from, to, inverse) {
+            el.dataset.selectionDirection = inverse;
+
+            nativeSetSelectionRange.call(el, from, to, inverse);
+        };
+    }
+
+    overrideSetSelectionRange(input);
+    overrideSetSelectionRange(textarea);
+</script>
+</body>
+</html>

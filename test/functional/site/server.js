@@ -39,6 +39,14 @@ Server.prototype._setupRoutes = function () {
         res.send(DEFAULT_PAGE_MARKUP);
     });
 
+    this.app.get('/xhr-request/:delay', function (req, res) {
+        var delay = req.params.delay || 0;
+
+        setTimeout(function () {
+            res.send(req.url);
+        }, delay);
+    });
+
     this.app.get('*', function (req, res) {
         var reqPath      = req.params[0] || '';
         var resourcePath = path.join(server.basePath, reqPath);

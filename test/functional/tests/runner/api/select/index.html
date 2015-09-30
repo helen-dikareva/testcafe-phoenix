@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select</title>
+</head>
+<body style="height: 1500px;">
+<input type="text" id="inputText" style="position: absolute; margin-left: 50px; margin-top: 50px;" value="123456789"/>
+<textarea id="textarea" style="width:450px; height:400px; position: absolute; left: 300px;">
+    123456789abcdlasdkjasdjkajkdjkasjkdjkajskd
+    12345678901234567890
+    123456
+    efghifkklfkalsklfkalskdlkaldklakdlkalskdaslkdl
+    jklmopsdajdkjaksjdkkjdk
+    123456
+    efghifkklfkalsklfkalskdlkaldklakdlkalskdaslkdl
+    jklmopsdajdkjaksjdkkjdk
+    123456
+    efghifkklfkalsklfkalskdlkaldklakdlkalskdaslkdl
+    jklmopsdajdkjaksjdkkjdk
+    123456
+    efghifkklfkalsklfkalskdlkaldklakdlkalskdaslkdl
+    jklmopsdajdkjaksjdkkjdk
+    123456a
+    efghifkklfkalsklfkalskdlkaldklakdlkalskdaslkdl
+    jklmopsdajdkjaksjdkkjdk
+    123456
+    efghifkklfkalsklfkalskdlkaldklakdlkalskdaslkdl
+    jklmopsdajdkjaksjdkkjdk
+    dasdasdasdasdajksdjkajskdjk
+    ajkdjkasjkdjksjkdjksjdkjs
+    qwerty test cafesadkaldklakldlakdklakldkalskd
+</textarea>
+
+<script type="text/javascript">
+    var input = document.getElementById('inputText');
+    var textarea = document.getElementById('textarea');
+
+    var nativeSetSelectionRange = input.setSelectionRange;
+
+    function overrideSetSelectionRange(el) {
+        el.setSelectionRange = function (from, to, inverse) {
+            el.dataset.selectionDirection = inverse;
+
+            nativeSetSelectionRange.call(el, from, to, inverse);
+        };
+    }
+
+    overrideSetSelectionRange(input);
+    overrideSetSelectionRange(textarea);
+
+</script>
+</body>
+</html>

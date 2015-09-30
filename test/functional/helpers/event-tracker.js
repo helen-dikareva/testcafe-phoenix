@@ -30,7 +30,7 @@ function reset ($el, events) {
 }
 
 function getCount ($el, event) {
-    return $el.data(EVENT_DATA_PREFIX + event);
+    return $el.data(EVENT_DATA_PREFIX + event) || 0;
 }
 
 /*eslint-disable no-unused-vars */

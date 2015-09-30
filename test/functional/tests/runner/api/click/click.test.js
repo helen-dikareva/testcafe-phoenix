@@ -3,6 +3,10 @@
 
 '@require :eventTracker';
 '@require :browser';
+'@require :event';
+
+var clickCount  = 0;
+var errorScroll = false;
 
 '@test'['Call click with different arguments'] = {
     '1.Call click for dom element as a parameter': function () {
@@ -337,6 +341,56 @@
     }
 };
 
+'@test'['Focus event doesn\'t raised on click if mousedown event prevented'] = {
+    '1.Click on input which prevent mousedown event': function () {
+        var input  = $('#inputText')[0];
+        var shared = this;
+
+        input.onmousedown = event.preventDefault;
+        input.onfocus     = function () {
+            shared.focusRaised = true;
+        };
+
+        act.click(input);
+    },
+
+    '2.Check input is not active element': function () {
+        notOk(this.focusRaised);
+        eq(document.activeElement, document.body);
+    }
+};
+
+'@test'['Click element with scroll then click body near to first click does not raise scroll again'] = {
+    '1. Click on element first time': function () {
+        var $div = $('#div5');
+
+        $div.click(function () {
+            clickCount++
+        });
+
+        $div.bind('mousedown', function () {
+            unbindScrollHandlers();
+        });
+
+        bindScrollHandlers();
+
+        act.click($div);
+    },
+
+    '2.Click on element second time': function () {
+        eq(clickCount, 1);
+
+        bindScrollHandlers();
+
+        act.click($('#div5'));
+    },
+
+    '3.Check scrolling': function () {
+        eq(clickCount, 2);
+        notOk(errorScroll);
+    }
+};
+
 '@test'['SHOULD FAIL: when the first argument is empty'] = {
     '1.Click on an nonexistent element': function () {
         act.click('#nonexistentElement');
@@ -355,4 +409,23 @@
 function checkThatElementClicked ($el) {
     eq(eventTracker.getCount($el, 'click'), 1, 'element clicked');
     eventTracker.reset($el, 'click');
+}
+
+function scrollHandler () {
+    if (clickCount === 1)
+        errorScroll = true;
+}
+
+function bindScrollHandlers () {
+    var $container = $('#div1');
+
+    $container.bind('scroll', scrollHandler);
+    $(window).bind('scroll', scrollHandler);
+}
+
+function unbindScrollHandlers () {
+    var $container = $('#div1');
+
+    $container.unbind('scroll', scrollHandler);
+    $(window).unbind('scroll', scrollHandler);
 }
