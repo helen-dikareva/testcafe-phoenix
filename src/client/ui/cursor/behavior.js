@@ -60,7 +60,7 @@ CursorBehavior.prototype.start = function (position, iFrameInitiator) {
         this.pointerOffsetY = Math.ceil(styleUtils.getHeight(this.cursorElement) / 2);
     }
 
-    this.move(positionUtils.getFixedPosition(position, iFrameInitiator, true));
+    this.move(positionUtils.getFixedPosition(position, iFrameInitiator));
 
     if (withCursorEmulation())
         this.show();

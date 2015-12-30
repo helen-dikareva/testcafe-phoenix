@@ -1,6 +1,7 @@
 import testCafeCore from '../../deps/testcafe-core';
 import * as automationSettings from '../settings';
-import movePlaybackAutomation from '../playback/move';
+import * as automationUtil from '../util';
+import MoveAutomation from '../playback/move';
 
 var SETTINGS      = testCafeCore.SETTINGS;
 var positionUtils = testCafeCore.positionUtils;
@@ -12,10 +13,22 @@ export default function (element, options, callback) {
         return;
     }
 
-    if (options.offsetX)
-        options.offsetX = Math.round(options.offsetX);
-    if (options.offsetY)
-        options.offsetY = Math.round(options.offsetY);
+    var offsets   = automationUtil.getDefaultAutomationOffsets(element);
+    var modifiers = {
+        ctrl:  options.ctrl,
+        shift: options.shift,
+        alt:   options.alt,
+        meta:  options.meta
+    };
 
-    movePlaybackAutomation(element, false, options, callback);
+    if (typeof options.offsetX === 'number')
+        offsets.offsetX = Math.round(options.offsetX);
+    if (typeof options.offsetY === 'number')
+        offsets.offsetY = Math.round(options.offsetY);
+
+    var moveAutomation = new MoveAutomation(element, offsets, { modifiers });
+
+    moveAutomation
+        .run()
+        .then(callback);
 };

@@ -181,8 +181,7 @@ export function getElementUnderCursor (x, y, currentDocument, target) {
         return mapElement && mapElement.name === topElement.useMap.substring(1) ? target : topElement;
     }
 
-    if ((target.tagName.toLowerCase() !== 'a' && !domUtils.getParents(target, 'a').length) ||
-        !target.textContent.length)
+    if ((target.tagName.toLowerCase() !== 'a' && !domUtils.getParents(target, 'a').length) || !target.textContent.length)
         return topElement;
 
     //NOTE: we caught link's child with text so it fit for redirect
@@ -206,4 +205,13 @@ export function getElementUnderCursor (x, y, currentDocument, target) {
     }
 
     return topElement;
+}
+
+export function getDefaultAutomationOffsets (element) {
+    var elementCenter = positionUtils.getElementCenter(element);
+
+    return {
+        offsetX: elementCenter.x,
+        offsetY: elementCenter.y
+    };
 }

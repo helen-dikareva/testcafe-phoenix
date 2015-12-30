@@ -4,13 +4,15 @@ import * as styleUtils from './style';
 import * as domUtils from './dom';
 
 
-export function getIFrameCoordinates (iFrameWin) {
+export function getIFrameClientCoordinates (iFrameWin) {
     var iFrame              = domUtils.getIframeByWindow(iFrameWin);
-    var iFrameOffset        = getOffsetPosition(iFrame);
+    var { left, top }       = getOffsetPosition(iFrame);
+    var clientPosition      = offsetToClientCoords({ x: left, y: top });
     var iFrameBorders       = styleUtils.getBordersWidth(iFrame);
     var iFramePadding       = styleUtils.getElementPadding(iFrame);
-    var iFrameRectangleLeft = iFrameOffset.left + iFrameBorders.left + iFramePadding.left;
-    var iFrameRectangleTop  = iFrameOffset.top + iFrameBorders.top + iFramePadding.top;
+    var iFrameRectangleLeft = clientPosition.x + iFrameBorders.left + iFramePadding.left;
+    var iFrameRectangleTop  = clientPosition.y + iFrameBorders.top + iFramePadding.top;
+
 
     return {
         left:   iFrameRectangleLeft,
@@ -248,28 +250,25 @@ export function getFixedPositionForIFrame (pos, iFrameWin) {
     var iFrameBorders = styleUtils.getBordersWidth(iFrame);
     var iFramePadding = styleUtils.getElementPadding(iFrame);
 
-    return {
+    return offsetToClientCoords({
         x: pos.x - iFrameOffset.left - iFrameBorders.left - iFramePadding.left,
         y: pos.y - iFrameOffset.top - iFrameBorders.top - iFramePadding.top
-    };
+    });
 }
 
-export function getFixedPosition (pos, iFrameWin, convertToClient) {
+export function getFixedPosition (pos, iFrameWin) {
     if (!iFrameWin)
         return pos;
 
-    var iFrame         = domUtils.getIframeByWindow(iFrameWin);
-    var iFrameOffset   = getOffsetPosition(iFrame);
-    var iFrameBorders  = styleUtils.getBordersWidth(iFrame);
-    var iFramePadding  = styleUtils.getElementPadding(iFrame);
-    var documentScroll = styleUtils.getElementScroll(document);
+    var iFrame        = domUtils.getIframeByWindow(iFrameWin);
+    var iFrameOffset  = getOffsetPosition(iFrame);
+    var iFrameBorders = styleUtils.getBordersWidth(iFrame);
+    var iFramePadding = styleUtils.getElementPadding(iFrame);
 
-    return {
-        x: pos.x + iFrameOffset.left + iFrameBorders.left + iFramePadding.left -
-           (convertToClient ? documentScroll.left : 0),
-        y: pos.y + iFrameOffset.top + iFrameBorders.top + iFramePadding.top -
-           (convertToClient ? documentScroll.top : 0)
-    };
+    return offsetToClientCoords({
+        x: pos.x + iFrameOffset.left + iFrameBorders.left + iFramePadding.left,
+        y: pos.y + iFrameOffset.top + iFrameBorders.top + iFramePadding.top
+    });
 }
 
 export function clientToOffsetCoord (coords, currentDocument) {
@@ -288,6 +287,12 @@ export function findCenter (el) {
         x: Math.round(rectangle.left + rectangle.width / 2),
         y: Math.round(rectangle.top + rectangle.height / 2)
     };
+}
+
+export function getClientPosition (el) {
+    var { left, top } = getOffsetPosition(el);
+
+    return offsetToClientCoords({ x: left, y: top });
 }
 
 export function getElementClientRectangle (el) {
@@ -311,6 +316,15 @@ export function calcRelativePosition (dimensions, toDimensions) {
         right:  toDimensions.right - toDimensions.border.right - toDimensions.scrollbar.right - dimensions.right,
         top:    dimensions.top - (toDimensions.top + toDimensions.border.top),
         bottom: toDimensions.bottom - toDimensions.border.bottom - toDimensions.scrollbar.bottom - dimensions.bottom
+    };
+}
+
+export function getElementCenter (el) {
+    var rect = getElementRectangle(el);
+
+    return {
+        x: Math.floor(rect.width / 2),
+        y: Math.floor(rect.height / 2)
     };
 }
 

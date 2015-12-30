@@ -1,6 +1,6 @@
 import hammerhead from '../../deps/hammerhead';
 import testCafeCore from '../../deps/testcafe-core';
-import { sendRequestToParentFrame } from '../../utils/iframe';
+import { sendRequestToFrame } from '../../utils/iframe';
 
 var Promise        = hammerhead.Promise;
 var messageSandbox = hammerhead.eventSandbox.message;
@@ -158,11 +158,11 @@ export default class ScrollAutomation {
         }
 
         if (window.top !== window.self) {
-            return sendRequestToParentFrame({
+            return sendRequestToFrame({
                 cmd:     SCROLL_REQUEST_CMD,
                 offsetX: currentOffsetX,
                 offsetY: currentOffsetY
-            }, SCROLL_RESPONSE_CMD);
+            }, SCROLL_RESPONSE_CMD, window.parent);
         }
 
         return Promise.resolve();

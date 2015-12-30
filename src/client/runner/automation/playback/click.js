@@ -3,7 +3,7 @@ import testCafeCore from '../../deps/testcafe-core';
 import testCafeUI from '../../deps/testcafe-ui';
 import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
-import movePlaybackAutomation from '../playback/move';
+import MoveAutomation from '../playback/move';
 import async from '../../deps/async';
 
 var browserUtils     = hammerhead.utils.browser;
@@ -62,18 +62,29 @@ function clickOnSelectChildElement (childElement, clickOptions, actionCallback, 
     async.series({
             moveCursorToElement: function (callback) {
                 //NOTE: 'target' is option from emulated optionList or the point (x,y-coordinates) of real option element
-                var target = null;
+                var target            = null;
+                var offsets           = null;
+                var selectChildCenter = null;
 
-                if (isOptionListExpanded)
-                    target = targetElement;
+                if (isOptionListExpanded) {
+                    target  = targetElement;
+                    offsets = automationUtil.getDefaultAutomationOffsets(target);
+                }
                 else {
                     selectElement.scrollOptionListByChild(childElement);
-                    target = selectElement.getSelectChildCenter(childElement);
+                    target            = document.documentElement;
+                    selectChildCenter = selectElement.getSelectChildCenter(childElement);
+                    offsets           = {
+                        offsetX: selectChildCenter.x,
+                        offsetY: selectChildCenter.y
+                    };
                 }
 
-                movePlaybackAutomation(target, false, {}, function () {
-                    window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
-                });
+                var moveAutomation = new MoveAutomation(target, offsets);
+
+                moveAutomation
+                    .run()
+                    .then(() => window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY));
             },
 
             click: function () {
@@ -172,18 +183,31 @@ export default function (el, options, runCallback, errorCallback) {
         screenPoint         = null,
         eventPoint          = null,
         eventOptions        = null,
-        target              = positionUtils.isContainOffset(el, options.offsetX, options.offsetY) ?
-                              el : automationUtil.getMouseActionPoint(el, options, false),
+        clickOnElement      = positionUtils.isContainOffset(el, options.offsetX, options.offsetY),
+        target              = clickOnElement ? el : automationUtil.getMouseActionPoint(el, options, false),
+        targetElement       = clickOnElement ? el : document.documentElement,
         notPrevented        = true,
         topElement          = null,
         isInvisibleElement  = false,
         currentTopElement   = null,
-        skipClickSimulation = false;
+        skipClickSimulation = false,
+        offsets             = clickOnElement ? automationUtil.getDefaultAutomationOffsets(el) : {
+            offsetX: target.x,
+            offsetY: target.y
+        },
+        modifiers           = {
+            ctrl:  options.ctrl,
+            shift: options.shift,
+            alt:   options.alt,
+            meta:  options.meta
+        };
 
-    if (options.offsetX)
-        options.offsetX = Math.round(options.offsetX);
-    if (options.offsetY)
-        options.offsetY = Math.round(options.offsetY);
+    if (clickOnElement) {
+        if (typeof options.offsetX === 'number')
+            offsets.offsetX = Math.round(options.offsetX);
+        if (typeof options.offsetY === 'number')
+            offsets.offsetY = Math.round(options.offsetY);
+    }
 
     async.series({
         moveCursorToElement: function (callback) {
@@ -194,27 +218,31 @@ export default function (el, options, runCallback, errorCallback) {
                 return;
             }
 
-            movePlaybackAutomation(target, false, options, function () {
-                if ((isSVGElement && browserUtils.isOpera) || el.tagName.toLowerCase() === 'tref')
-                    topElement = el; //NOTE: document.elementFromPoint can't find this element
-                else {
-                    screenPoint = automationUtil.getMouseActionPoint(el, options, true);
-                    eventPoint  = automationUtil.getEventOptionCoordinates(el, screenPoint);
+            var moveAutomation = new MoveAutomation(targetElement, offsets, { modifiers });
 
-                    eventOptions = hammerhead.utils.extend({
-                        clientX: eventPoint.x,
-                        clientY: eventPoint.y
-                    }, options);
+            moveAutomation
+                .run()
+                .then(() => {
+                    if ((isSVGElement && browserUtils.isOpera) || el.tagName.toLowerCase() === 'tref')
+                        topElement = el; //NOTE: document.elementFromPoint can't find this element
+                    else {
+                        screenPoint = automationUtil.getMouseActionPoint(el, options, true);
+                        eventPoint  = automationUtil.getEventOptionCoordinates(el, screenPoint);
 
-                    topElement = automationUtil.getElementUnderCursor(screenPoint.x, screenPoint.y, null, target);
+                        eventOptions = hammerhead.utils.extend({
+                            clientX: eventPoint.x,
+                            clientY: eventPoint.y
+                        }, options);
 
-                    if (!topElement) {
-                        isInvisibleElement = true;
-                        topElement         = el;
+                        topElement = automationUtil.getElementUnderCursor(screenPoint.x, screenPoint.y, null, target);
+
+                        if (!topElement) {
+                            isInvisibleElement = true;
+                            topElement         = el;
+                        }
                     }
-                }
-                window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
-            });
+                    window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
+                });
         },
 
         //NOTE: touch devices only

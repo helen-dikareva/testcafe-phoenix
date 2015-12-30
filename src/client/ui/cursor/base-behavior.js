@@ -54,7 +54,7 @@ CursorBaseBehavior.CURSOR_HIDE_RESPONSE_CMD       = 'cursorHideResponse';
 CursorBaseBehavior.CURSOR_SHOW_RESPONSE_CMD       = 'cursorShowResponse';
 
 CursorBaseBehavior.prototype.move = function (to, callback, iFrameInitiator) {
-    this.cursorPosition = positionUtils.getFixedPosition(to, iFrameInitiator, true);
+    this.cursorPosition = positionUtils.getFixedPosition(to, iFrameInitiator);
 
     if (this.cursorElement) {
         styleUtils.set(this.cursorElement, {
