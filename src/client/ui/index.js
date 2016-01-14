@@ -1,11 +1,15 @@
 import hammerhead from './deps/hammerhead';
 
-import * as cursor from './cursor';
+import * as cursorOld from './cursor-old';
 import * as selectElement from './select-element';
 import * as modalBackground from './modal-background';
 import ProgressPanel from './progress-panel';
+import CursorUI from './cursor';
+import IframeCursorUI from './cursor/iframe-cursor';
 
-exports.cursor          = cursor;
+exports.cursorOld       = cursorOld; //obsoleted
+exports.CursorUI        = CursorUI;
+exports.IframeCursorUI  = IframeCursorUI;
 exports.selectElement   = selectElement;
 exports.modalBackground = modalBackground;
 exports.ProgressPanel   = ProgressPanel;

@@ -22,7 +22,6 @@ var serviceUtils             = testCafeCore.serviceUtils;
 var domUtils                 = testCafeCore.domUtils;
 var eventUtils               = testCafeCore.eventUtils;
 
-var cursor          = testCafeUI.cursor;
 var modalBackground = testCafeUI.modalBackground;
 
 
@@ -303,28 +302,20 @@ RunnerBase.prototype._initIFrameBehavior = function () {
 };
 
 RunnerBase.prototype._prepareStepsExecuting = function (callback, skipPageWaiting) {
-    function runCallback () {
-        cursor.init();
+    if (skipPageWaiting) {
         callback();
+        return;
     }
 
-    if (skipPageWaiting)
-        runCallback();
-    else {
-        waitPageLoad(function () {
-            window.setTimeout(function () {
-                transport.batchUpdate(function () {
-                    jQuerySelectorExtensions.init();
+    waitPageLoad(() => {
+        window.setTimeout(() => {
+            transport.batchUpdate(() => {
+                jQuerySelectorExtensions.init();
 
-                    actionBarrier.waitPageInitialization(function () {
-                        cursor.init();
-
-                        callback();
-                    });
-                });
-            }, ANIMATIONS_WAIT_DELAY);
-        });
-    }
+                actionBarrier.waitPageInitialization(callback);
+            });
+        }, ANIMATIONS_WAIT_DELAY);
+    });
 };
 
 RunnerBase.WAITING_FOR_ACTION_TARGET_MESSAGE = 'Waiting for the target element of the next action to appear';

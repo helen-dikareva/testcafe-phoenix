@@ -305,10 +305,9 @@ export default class MoveAutomation {
             this.y = Math.floor(this.startPoint.y + this.distanceY * progress);
         }
 
-        Cursor.move(this.x, this.y);
-        this._emulateEvents();
-
-        return nextTick();
+        return Cursor.move(this.x, this.y)
+            .then(() => this._emulateEvents())
+            .then(nextTick);
     }
 
     _isMovingFinished () {
@@ -380,7 +379,7 @@ export default class MoveAutomation {
                                 Cursor.setActiveWindow(window);
 
                                 if (iframeUnderCursor || window.top !== window.self)
-                                    Cursor.move(message.x, message.y);
+                                    return Cursor.move(message.x, message.y);
                             });
                     }
                 })

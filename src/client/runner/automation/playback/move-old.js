@@ -20,7 +20,7 @@ var positionUtils         = testCafeCore.positionUtils;
 var styleUtils            = testCafeCore.styleUtils;
 var eventUtils            = testCafeCore.eventUtils;
 
-var cursor = testCafeUI.cursor;
+var cursor = testCafeUI.cursorOld;
 
 //NOTE: We should save the last hovered element between runs because of T286582
 var lastHoveredElement = null;

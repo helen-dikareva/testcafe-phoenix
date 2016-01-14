@@ -5,6 +5,7 @@ import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
 import MoveAutomation from '../playback/move';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
 var browserUtils     = hammerhead.utils.browser;
 var eventSimulator   = hammerhead.eventSandbox.eventSimulator;
@@ -17,7 +18,6 @@ var styleUtils    = testCafeCore.styleUtils;
 var eventUtils    = testCafeCore.eventUtils;
 var arrayUtils    = testCafeCore.arrayUtils;
 
-var cursor        = testCafeUI.cursor;
 var selectElement = testCafeUI.selectElement;
 
 
@@ -237,8 +237,10 @@ export default function (el, options, runCallback, errorCallback) {
 
         //NOTE: touch devices only
         cursorTouchMouseDown: function (callback) {
-            if (browserUtils.hasTouchEvents)
-                cursor.lMouseDown(callback);
+            if (browserUtils.hasTouchEvents) {
+                Cursor.leftButtonDown()
+                    .then(callback);
+            }
             else
                 callback();
         },
@@ -255,8 +257,10 @@ export default function (el, options, runCallback, errorCallback) {
         },
 
         cursorMouseDown: function (callback) {
-            if (!browserUtils.hasTouchEvents)
-                cursor.lMouseDown(callback);
+            if (!browserUtils.hasTouchEvents) {
+                Cursor.leftButtonDown()
+                    .then(callback);
+            }
             else
                 callback();
         },
@@ -331,7 +335,8 @@ export default function (el, options, runCallback, errorCallback) {
         },
 
         cursorMouseUp: function (callback) {
-            cursor.mouseUp(callback);
+            Cursor.buttonUp()
+                .then(callback);
         },
 
         mouseup: function (callback) {

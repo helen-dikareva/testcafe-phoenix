@@ -5,6 +5,7 @@ import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
 import MoveAutomation from '../playback/move';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
 const DRAGGING_SPEED = 4; // pixels/ms
 const MIN_MOVING_TIME = 25;
@@ -19,8 +20,6 @@ var contentEditable = testCafeCore.contentEditable;
 var positionUtils   = testCafeCore.positionUtils;
 var domUtils        = testCafeCore.domUtils;
 var styleUtils      = testCafeCore.styleUtils;
-
-var cursor = testCafeUI.cursor;
 
 
 export default function (el, to, options, runCallback) {
@@ -84,7 +83,7 @@ export default function (el, to, options, runCallback) {
                     else
                         pointTo = automationUtil.getDragEndPoint(startPosition, to, currentDocument);
 
-                    topElement = cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
+                    topElement = Cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
 
                     if (!topElement) {
                         runCallback(el);
@@ -95,7 +94,8 @@ export default function (el, to, options, runCallback) {
                 });
         },
         cursorMouseDown:     function (callback) {
-            cursor.lMouseDown(callback);
+            Cursor.leftButtonDown()
+                .then(callback);
         },
 
         take: function (callback) {
@@ -155,11 +155,11 @@ export default function (el, to, options, runCallback) {
                         y: screenPointTo.y - styleUtils.getScrollTop(currentIFrame.contentWindow)
                     };
 
-                    topElement = cursor.getElementUnderCursor(screenPointToInIFrame.x, screenPointToInIFrame.y);
+                    topElement = Cursor.getElementUnderCursor(screenPointToInIFrame.x, screenPointToInIFrame.y);
                 }
             }
             else
-                topElement = cursor.getElementUnderCursor(screenPointTo.x, screenPointTo.y);
+                topElement = Cursor.getElementUnderCursor(screenPointTo.x, screenPointTo.y);
 
             if (!topElement) {
                 runCallback();
@@ -171,7 +171,8 @@ export default function (el, to, options, runCallback) {
                 clientY: eventPointTo.y
             }, options);
 
-            cursor.mouseUp(callback);
+            Cursor.buttonUp()
+                .then(callback);
         },
 
         mouseUp: function (callback) {
@@ -185,7 +186,7 @@ export default function (el, to, options, runCallback) {
 
         click: function () {
             //B231323
-            if (cursor.getElementUnderCursor(screenPointTo.x, screenPointTo.y) === topElement)
+            if (Cursor.getElementUnderCursor(screenPointTo.x, screenPointTo.y) === topElement)
                 eventSimulator.click(topElement, eventOptionsEnd);
 
             runCallback();

@@ -5,6 +5,7 @@ import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
 import clickPlaybackAutomation from '../playback/click';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
 var browserUtils   = hammerhead.utils.browser;
 var eventSimulator = hammerhead.eventSandbox.eventSimulator;
@@ -15,7 +16,6 @@ var positionUtils = testCafeCore.positionUtils;
 var styleUtils    = testCafeCore.styleUtils;
 var eventUtils    = testCafeCore.eventUtils;
 
-var cursor        = testCafeUI.cursor;
 var selectElement = testCafeUI.selectElement;
 
 
@@ -37,7 +37,7 @@ export default function (el, options, actionCallback) {
 
     if (!positionUtils.isContainOffset(el, options.offsetX, options.offsetY)) {
         point      = automationUtil.getMouseActionPoint(el, options, true);
-        curElement = cursor.getElementUnderCursor(point.x, point.y);
+        curElement = Cursor.getElementUnderCursor(point.x, point.y);
     }
 
     if (!curElement)
@@ -76,8 +76,10 @@ export default function (el, options, actionCallback) {
 
                 //NOTE: touch devices only
                 cursorTouchMouseDown: function (callback) {
-                    if (browserUtils.hasTouchEvents)
-                        cursor.lMouseDown(callback);
+                    if (browserUtils.hasTouchEvents) {
+                        Cursor.leftButtonDown()
+                            .then(callback);
+                    }
                     else
                         callback();
                 },
@@ -94,8 +96,10 @@ export default function (el, options, actionCallback) {
                 },
 
                 cursorMouseDown: function (callback) {
-                    if (!browserUtils.hasTouchEvents)
-                        cursor.lMouseDown(callback);
+                    if (!browserUtils.hasTouchEvents) {
+                        Cursor.leftButtonDown()
+                            .then(callback);
+                    }
                     else
                         callback();
                 },
@@ -151,7 +155,8 @@ export default function (el, options, actionCallback) {
                 },
 
                 cursorMouseUp: function (callback) {
-                    cursor.mouseUp(callback);
+                    Cursor.buttonUp()
+                        .then(callback);
                 },
 
                 mouseup: function (callback) {

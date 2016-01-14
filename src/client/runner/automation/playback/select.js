@@ -7,6 +7,7 @@ import * as automationSelectUtil from './select-util';
 import MoveAutomation from '../playback/move';
 import ScrollAutomation from '../playback/scroll';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
 var browserUtils     = hammerhead.utils.browser;
 var extend           = hammerhead.utils.extend;
@@ -19,8 +20,6 @@ var textSelection   = testCafeCore.textSelection;
 var domUtils        = testCafeCore.domUtils;
 var positionUtils   = testCafeCore.positionUtils;
 var eventUtils      = testCafeCore.eventUtils;
-
-var cursor = testCafeUI.cursor;
 
 
 export default function (el, options, runCallback) {
@@ -116,7 +115,7 @@ export default function (el, options, runCallback) {
                         clientY: eventPointFrom.y
                     }, options);
 
-                    topElement = cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
+                    topElement = Cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
 
                     if (!topElement) {
                         runCallback();
@@ -131,7 +130,8 @@ export default function (el, options, runCallback) {
         },
 
         cursorMousseDown: function (callback) {
-            cursor.lMouseDown(callback);
+            Cursor.leftButtonDown()
+                .then(callback);
         },
 
         mousedown: function (callback) {
@@ -155,7 +155,7 @@ export default function (el, options, runCallback) {
             else
                 notPrevented = eventSimulator.mousedown(topElement, eventOptionsStart);
 
-            currentTopElement = cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
+            currentTopElement = Cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
 
             if (currentTopElement)
                 topElement = currentTopElement;
@@ -219,7 +219,7 @@ export default function (el, options, runCallback) {
                 point = positionUtils.findCenter(topElement);
 
             automationSelectUtil.scrollElementByPoint(topElement, point);
-            point = automationSelectUtil.updatePointByScrollElement(topElement, point);
+            point     = automationSelectUtil.updatePointByScrollElement(topElement, point);
 
             screenPointTo = positionUtils.offsetToClientCoords(point);
             eventPointTo  = automationUtil.getEventOptionCoordinates(topElement, screenPointTo);
@@ -241,7 +241,8 @@ export default function (el, options, runCallback) {
         },
 
         cursorMouseUp: function (callback) {
-            cursor.mouseUp(callback);
+            Cursor.buttonUp()
+                .then(callback);
         },
 
         mouseup: function () {

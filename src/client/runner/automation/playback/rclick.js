@@ -5,6 +5,7 @@ import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
 import MoveAutomation from '../playback/move';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
 var browserUtils   = hammerhead.utils.browser;
 var eventSimulator = hammerhead.eventSandbox.eventSimulator;
@@ -13,8 +14,6 @@ var SETTINGS      = testCafeCore.SETTINGS;
 var domUtils      = testCafeCore.domUtils;
 var positionUtils = testCafeCore.positionUtils;
 var eventUtils    = testCafeCore.eventUtils;
-
-var cursor = testCafeUI.cursor;
 
 
 export default function (el, options, actionCallback) {
@@ -97,7 +96,8 @@ export default function (el, options, actionCallback) {
         },
 
         cursorMouseDown: function (callback) {
-            cursor.rMouseDown(callback);
+            Cursor.rightButtonDown()
+                .then(callback);
         },
 
         mousedown: function (callback) {
@@ -125,14 +125,15 @@ export default function (el, options, actionCallback) {
         },
 
         cursorMouseUp: function (callback) {
-            cursor.mouseUp(callback);
+            Cursor.buttonUp()
+                .then(callback);
         },
 
         mouseup: function (callback) {
             eventSimulator.mouseup(topElement, eventOptions);
 
             if (!isInvisibleElement && screenPoint) {
-                currentTopElement = cursor.getElementUnderCursor(screenPoint.x, screenPoint.y, null, target);
+                currentTopElement = Cursor.getElementUnderCursor(screenPoint.x, screenPoint.y, null, target);
 
                 if (currentTopElement)
                     topElement = currentTopElement;

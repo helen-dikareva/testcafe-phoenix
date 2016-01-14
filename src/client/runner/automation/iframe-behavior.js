@@ -10,7 +10,7 @@ var CROSS_DOMAIN_MESSAGES = testCafeCore.CROSS_DOMAIN_MESSAGES;
 var domUtils              = testCafeCore.domUtils;
 var positionUtils         = testCafeCore.positionUtils;
 
-var cursor = testCafeUI.cursor;
+var cursor = testCafeUI.cursorOld;
 
 
 function onMessage (e) {

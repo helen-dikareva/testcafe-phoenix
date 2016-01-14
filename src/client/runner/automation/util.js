@@ -1,6 +1,7 @@
 import hammerhead from '../deps/hammerhead';
 import testCafeCore from '../deps/testcafe-core';
 import testCafeUI from '../deps/testcafe-ui';
+import Cursor from './cursor';
 
 var browserUtils     = hammerhead.utils.browser;
 var focusBlurSandbox = hammerhead.eventSandbox.focusBlur;
@@ -10,8 +11,6 @@ var textSelection   = testCafeCore.textSelection;
 var domUtils        = testCafeCore.domUtils;
 var positionUtils   = testCafeCore.positionUtils;
 var styleUtils      = testCafeCore.styleUtils;
-
-var cursor = testCafeUI.cursor;
 
 
 function focusElementByLabel (label, callback) {
@@ -168,7 +167,7 @@ export function getDragEndPoint (startPosition, to, currentDocument) {
 }
 
 export function getElementUnderCursor (x, y, currentDocument, target) {
-    var topElement = cursor.getElementUnderCursor(x, y, currentDocument);
+    var topElement = Cursor.getElementUnderCursor(x, y, currentDocument);
 
     if (!target || !domUtils.isDomElement(target) || topElement === target || !topElement)
         return topElement;
@@ -181,7 +180,8 @@ export function getElementUnderCursor (x, y, currentDocument, target) {
         return mapElement && mapElement.name === topElement.useMap.substring(1) ? target : topElement;
     }
 
-    if ((target.tagName.toLowerCase() !== 'a' && !domUtils.getParents(target, 'a').length) || !target.textContent.length)
+    if ((target.tagName.toLowerCase() !== 'a' && !domUtils.getParents(target, 'a').length) ||
+        !target.textContent.length)
         return topElement;
 
     //NOTE: we caught link's child with text so it fit for redirect
@@ -191,13 +191,13 @@ export function getElementUnderCursor (x, y, currentDocument, target) {
 
     //NOTE: try to find myltiline link by her rectangle (T163678)
     var linkRect      = target.getBoundingClientRect();
-    var curTopElement = cursor.getElementUnderCursor(linkRect.right - 1, linkRect.top + 1, currentDocument);
+    var curTopElement = Cursor.getElementUnderCursor(linkRect.right - 1, linkRect.top + 1, currentDocument);
 
     if ((curTopElement && curTopElement === target) ||
         (domUtils.containsElement(target, curTopElement) && curTopElement.textContent.length))
         return curTopElement;
     else {
-        curTopElement = cursor.getElementUnderCursor(linkRect.left + 1, linkRect.bottom - 1);
+        curTopElement = Cursor.getElementUnderCursor(linkRect.left + 1, linkRect.bottom - 1);
 
         if ((curTopElement && curTopElement === target) ||
             (domUtils.containsElement(target, curTopElement) && curTopElement.textContent.length))
