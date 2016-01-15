@@ -1,61 +1,60 @@
-import Promise from 'promise';
+import Promise from 'pinkie';
+import promisifyEvent from 'promisify-event';
 import { resolve as resolvePath } from 'path';
+import { EventEmitter } from 'events';
+import flatten from 'flatten';
 import Bootstrapper from './bootstrapper';
+import Reporter from '../reporter';
 import Task from './task';
-import LocalBrowserConnection from '../browser-connection/local';
-import { concatFlattened } from '../utils/array';
-import fallbackDefault from '../utils/fallback-default';
 
-export default class Runner {
+
+export default class Runner extends EventEmitter {
     constructor (proxy, browserConnectionGateway) {
+        super();
+
         this.proxy        = proxy;
         this.bootstrapper = new Bootstrapper(browserConnectionGateway);
 
         this.opts = {
-            screenshotPath:        null,
-            takeScreenshotOnFails: false,
-            failOnJsErrors:        true,
-            quarantineMode:        false,
-            reportOutStream:       null,
-            formatter:             null
+            screenshotPath:         null,
+            takeScreenshotsOnFails: false,
+            skipJsErrors:           false,
+            quarantineMode:         false,
+            reportOutStream:        void 0
         };
     }
 
-    // Static
-    static _freeBrowserConnection (bc, errorHandler) {
-        bc.removeListener('error', errorHandler);
-
-        // NOTE: we should close local connections and
-        // related browsers once we've done
-        if (bc instanceof LocalBrowserConnection)
-            bc.close();
-    }
-
     // Run task
-    _runTask (Reporter, browserConnections, tests) {
-        return new Promise((resolve, reject) => {
-            var task     = new Task(tests, browserConnections, this.proxy, this.opts);
-            var reporter = new Reporter(task, this.opts.reportOutStream, this.opts.formatter);
+    async _runTask (reporterPlugin, browserSet, tests) {
+        var task     = new Task(tests, browserSet.connections, this.proxy, this.opts);
+        var reporter = new Reporter(reporterPlugin, task, this.opts.reportOutStream);
 
-            var bcErrorHandler = msg => {
-                task.abort();
-                task.removeAllListeners();
-                browserConnections.forEach(bc => Runner._freeBrowserConnection(bc, bcErrorHandler));
-                reject(new Error(msg));
-            };
+        task.on('browser-job-done', job => browserSet.releaseConnection(job.browserConnection));
 
-            browserConnections.forEach(bc => bc.once('error', bcErrorHandler));
+        try {
+            await Promise.race([
+                promisifyEvent(task, 'done'),
+                promisifyEvent(browserSet, 'error')
+            ]);
+        }
+        catch (err) {
+            task.abort();
+            task.removeAllListeners();
 
-            task.on('browser-job-done', job => Runner._freeBrowserConnection(job.browserConnection, bcErrorHandler));
+            await browserSet.dispose();
 
-            task.once('done', () => resolve(reporter.passed === reporter.total));
-        });
+            throw err;
+        }
+
+        await browserSet.dispose();
+
+        return reporter.testCount - reporter.passed;
     }
 
 
     // API
     src (...sources) {
-        sources = concatFlattened([], sources).map(path => resolvePath(path));
+        sources = flatten(sources).map(path => resolvePath(path));
 
         this.bootstrapper.sources = this.bootstrapper.sources.concat(sources);
 
@@ -63,15 +62,14 @@ export default class Runner {
     }
 
     browsers (...browsers) {
-        this.bootstrapper.browsers = concatFlattened(this.bootstrapper.browsers, browsers);
+        this.bootstrapper.browsers = this.bootstrapper.browsers.concat(flatten(browsers));
 
         return this;
     }
 
-    reporter (reporter, outStream = null, formatter = null) {
+    reporter (reporter, outStream) {
         this.bootstrapper.reporter = reporter;
         this.opts.reportOutStream  = outStream;
-        this.opts.formatter        = formatter;
 
         return this;
     }
@@ -83,18 +81,20 @@ export default class Runner {
     }
 
     screenshots (path, takeOnFails = false) {
-        this.opts.takeScreenshotOnFails  = takeOnFails;
-        this.bootstrapper.screenshotPath = path;
+        this.opts.takeScreenshotsOnFails = takeOnFails;
+        this.opts.screenshotPath         = path;
 
         return this;
     }
 
-    async run ({ failOnJsErrors, quarantineMode } = {}) {
-        this.opts.failOnJsErrors = fallbackDefault(failOnJsErrors, true);
-        this.opts.quarantineMode = fallbackDefault(quarantineMode, false);
+    async run ({ skipJsErrors, quarantineMode } = {}) {
+        this.opts.skipJsErrors   = !!skipJsErrors;
+        this.opts.quarantineMode = !!quarantineMode;
 
-        var { Reporter, browserConnections, tests } = await this.bootstrapper.createRunnableConfiguration();
+        var { reporterPlugin, browserSet, tests } = await this.bootstrapper.createRunnableConfiguration();
 
-        return await this._runTask(Reporter, browserConnections, tests);
+        this.emit('done-bootstrapping');
+
+        return await this._runTask(reporterPlugin, browserSet, tests);
     }
 }

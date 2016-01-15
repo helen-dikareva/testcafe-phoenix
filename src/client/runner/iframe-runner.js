@@ -1,10 +1,10 @@
-import * as hammerheadAPI from './deps/hammerhead';
+import hammerhead from './deps/hammerhead';
 import testCafeCore from './deps/testcafe-core';
 import * as dialogsAPI from './api/native-dialogs';
 import RunnerBase from './runner-base.js';
 
 var SETTINGS                 = testCafeCore.SETTINGS;
-var messageSandbox           = hammerheadAPI.MessageSandbox;
+var messageSandbox           = hammerhead.eventSandbox.message;
 var jQuerySelectorExtensions = testCafeCore.jQuerySelectorExtensions;
 var serviceUtils             = testCafeCore.serviceUtils;
 
@@ -46,16 +46,20 @@ IFrameRunner.prototype._onNextStepStarted = function (e) {
     e.callback();
 };
 
-IFrameRunner.prototype._onActionTargetWaitingStarted = function () {
-    messageSandbox.sendServiceMsg({ cmd: RunnerBase.IFRAME_ACTION_TARGET_WAITING_STARTED_CMD }, window.top);
+IFrameRunner.prototype._onActionTargetWaitingStarted = function (e) {
+    var msg = {
+        cmd:    RunnerBase.IFRAME_ACTION_TARGET_WAITING_STARTED_CMD,
+        params: e
+    };
+
+    messageSandbox.sendServiceMsg(msg, window.top);
 };
 
 IFrameRunner.prototype._onActionRun = function () {
     messageSandbox.sendServiceMsg({ cmd: RunnerBase.IFRAME_ACTION_RUN_CMD }, window.top);
 };
 
-IFrameRunner.prototype._onError = function (err) {
-
+IFrameRunner.prototype._onFatalError = function (err) {
     if (!SETTINGS.get().PLAYBACK || err.dialog)
         this.stepIterator.stop();
 
@@ -72,8 +76,6 @@ IFrameRunner.prototype._onAssertionFailed = function (e) {
         cmd: RunnerBase.IFRAME_FAILED_ASSERTION_CMD,
         err: e
     };
-
-    this.stepIterator.state.needScreeshot = true;
 
     messageSandbox.sendServiceMsg(msg, window.top);
 
@@ -100,41 +102,32 @@ IFrameRunner.prototype._onGetStepsSharedData = function (e) {
 
     function onMessage (response) {
         if (response.message.cmd === RunnerBase.IFRAME_GET_SHARED_DATA_RESPONSE_CMD) {
-            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
             e.callback(response.message.sharedData);
         }
     }
 
-    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
-};
-
-IFrameRunner.prototype._onExpectInactivity = function (e) {
-    var msg = {
-        cmd:      RunnerBase.IFRAME_EXPECT_INACTIVITY_CMD,
-        duration: e.duration
-    };
-
-    messageSandbox.sendServiceMsg(msg, window.top);
-    e.callback();
+    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 };
 
 IFrameRunner.prototype._onTakeScreenshot = function (e) {
     var msg = {
-        cmd:          RunnerBase.IFRAME_TAKE_SCREENSHOT_REQUEST_CMD,
-        isFailedStep: e.isFailedStep
+        cmd:      RunnerBase.IFRAME_TAKE_SCREENSHOT_REQUEST_CMD,
+        stepName: e.stepName,
+        filePath: e.filePath
     };
 
     messageSandbox.sendServiceMsg(msg, window.top);
 
     function onMessage (response) {
         if (response.message.cmd === RunnerBase.IFRAME_TAKE_SCREENSHOT_RESPONSE_CMD) {
-            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
             if (e && e.callback)
                 e.callback();
         }
     }
 
-    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 };
 
 IFrameRunner.prototype.onStepCompleted = function () {
@@ -159,7 +152,7 @@ IFrameRunner.prototype._onBeforeUnload = function () {
     function onMessage (response) {
         if (response.message.cmd === RunnerBase.IFRAME_BEFORE_UNLOAD_RESPONSE_CMD) {
 
-            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 
             if (response.message.res) {
                 if (iFrameTestRunner.stepIterator.state.stepDelayTimeout) {
@@ -173,7 +166,7 @@ IFrameRunner.prototype._onBeforeUnload = function () {
         }
     }
 
-    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 
     messageSandbox.sendServiceMsg(msg, window.top);
 };

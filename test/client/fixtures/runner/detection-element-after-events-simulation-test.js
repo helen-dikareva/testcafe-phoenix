@@ -1,5 +1,5 @@
-var hammerhead = window.getTestCafeModule('hammerhead');
-var browser    = hammerhead.Util.Browser;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
 var transport    = testCafeCore.get('./transport');
@@ -21,7 +21,7 @@ actionsAPI.init(stepIterator);
 
 
 var correctTestWaitingTime = function (time) {
-    if (browser.isTouchDevice && browser.isMozilla)
+    if (browserUtils.isTouchDevice && browserUtils.isFirefox)
         return time * 2;
 
     return time;
@@ -47,13 +47,13 @@ $(document).ready(function () {
         runArgumentsIterator(items, seriesActionsRun, asyncActionCallback);
     };
 
-    transport.fail = function (err) {
-        currentErrorCode = err.code;
+    transport.fatalError = function (err) {
+        currentErrorType = err.type;
         if (err.element)
             currentErrorElement = err.element;
     };
 
-    var currentErrorCode                    = null,
+    var currentErrorType                    = null,
         currentErrorElement                 = null,
         //constants
         TEST_ELEMENT_CLASS                  = 'testElement',
@@ -106,7 +106,7 @@ $(document).ready(function () {
         },
 
         startNext                           = function () {
-            if (browser.isIE) {
+            if (browserUtils.isIE) {
                 removeTestElements();
                 window.setTimeout(start, 30);
             }
@@ -382,9 +382,6 @@ $(document).ready(function () {
             $iFrame.appendTo($('body'));
         };
 
-    $('<div></div>').css({ width: 1, height: 1500, position: 'absolute' }).appendTo('body');
-    $('body').css('height', '1500px');
-
     //tests
     QUnit.testStart(function () {
         asyncActionCallback = function () {
@@ -392,9 +389,9 @@ $(document).ready(function () {
     });
 
     QUnit.testDone(function () {
-        if (!browser.isIE)
+        if (!browserUtils.isIE)
             removeTestElements();
-        currentErrorCode    = null;
+        currentErrorType    = null;
         currentErrorElement = null;
     });
 
@@ -581,7 +578,7 @@ $(document).ready(function () {
                 $input1 = addInputElement(200, 200, '12345');
                 $input2 = addInputElement(400, 400, 'qwerty');
 
-                if (browser.hasTouchEvents)
+                if (browserUtils.hasTouchEvents)
                     bindHandlerToTouchEvents($input1, $input2, 'touchstart', eventMonitorObject, true);
                 else
                     bindMouseHandlersToSwappingElements($input1, $input2, 'mousedown', eventMonitorObject, true);
@@ -594,7 +591,7 @@ $(document).ready(function () {
                 ok(!eventMonitorObject.elementOneMouseupRaised);
 
                 ok(!eventMonitorObject.elementTwoMousedownRaised);
-                if (!browser.hasTouchEvents)
+                if (!browserUtils.hasTouchEvents)
                     ok(eventMonitorObject.elementTwoSelectRaised);
                 ok(eventMonitorObject.elementTwoMouseupRaised);
             },
@@ -613,7 +610,7 @@ $(document).ready(function () {
                 $input1 = addInputElement(200, 200, '12345');
                 $input2 = addInputElement(400, 400, 'qwerty');
 
-                if (browser.hasTouchEvents)
+                if (browserUtils.hasTouchEvents)
                     bindHandlerToTouchEvents($input1, $input2, 'touchend', eventMonitorObject, true);
                 else
                     bindMouseHandlersToSwappingElements($input1, $input2, 'mouseup', eventMonitorObject, true);
@@ -622,7 +619,7 @@ $(document).ready(function () {
             },
             function () {
                 ok(eventMonitorObject.elementOneMousedownRaised);
-                if (!browser.hasTouchEvents)
+                if (!browserUtils.hasTouchEvents)
                     ok(eventMonitorObject.elementOneSelectRaised);
                 ok(eventMonitorObject.elementOneMouseupRaised);
 
@@ -984,8 +981,8 @@ $(document).ready(function () {
                     }, 500);
                 },
                 function () {
-                    equal($inputIFrame[0].value, browser.isWebKit ||
-                                                 browser.isMozilla ? '' : 'f', 'iframe\'s input value is correct');
+                    equal($inputIFrame[0].value, browserUtils.isWebKit ||
+                                                 browserUtils.isFirefox ? '' : 'f', 'iframe\'s input value is correct');
                 },
                 2000
             );

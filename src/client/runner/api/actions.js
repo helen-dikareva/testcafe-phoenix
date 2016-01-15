@@ -1,5 +1,6 @@
-import * as hammerheadAPI from '../deps/hammerhead';
+import hammerhead from '../deps/hammerhead';
 import testCafeCore from '../deps/testcafe-core';
+import testCafeUI from '../deps/testcafe-ui';
 import * as automation from '../automation/automation';
 import clickPlaybackAutomation from '../automation/playback/click';
 import dblClickPlaybackAutomation from '../automation/playback/dblclick';
@@ -10,20 +11,21 @@ import rClickPlaybackAutomation from '../automation/playback/rclick';
 import selectPlaybackAutomation from '../automation/playback/select';
 import typePlaybackAutomation from '../automation/playback/type';
 import * as sourceIndexTracker from '../source-index';
+import async from '../deps/async';
 
-var jsProcessor = hammerheadAPI.JSProcessor;
-var hhUpload    = hammerheadAPI.upload;
+
+var isJQueryObj = hammerhead.utils.isJQueryObj;
 
 var $               = testCafeCore.$;
 var SETTINGS        = testCafeCore.SETTINGS;
-var CONST           = testCafeCore.CONST;
-var ERRORS          = testCafeCore.ERRORS;
+var ERROR_TYPE      = testCafeCore.ERROR_TYPE;
 var contentEditable = testCafeCore.contentEditable;
 var domUtils        = testCafeCore.domUtils;
 var positionUtils   = testCafeCore.positionUtils;
 var styleUtils      = testCafeCore.styleUtils;
-var serviceUtils    = testCafeCore.serviceUtils;
+var arrayUtils      = testCafeCore.arrayUtils;
 var keyCharUtils    = testCafeCore.keyCharUtils;
+var selectElement   = testCafeUI.selectElement;
 
 
 var ELEMENT_AVAILABILITY_WAITING_TIMEOUT = 10000;
@@ -38,14 +40,14 @@ const CHECK_CONDITION_INTERVAL           = 50;
 var stepIterator = null;
 
 function ensureArray (target) {
-    return target instanceof Array ? target : [target];
+    return arrayUtils.isArray(target) ? target : [target];
 }
 
 function isStringOrStringArray (target, forbidEmptyArray) {
     if (typeof target === 'string')
         return true;
 
-    if (target instanceof Array && (!forbidEmptyArray || target.length)) {
+    if (arrayUtils.isArray(target) && (!forbidEmptyArray || target.length)) {
         for (var i = 0; i < target.length; i++) {
             if (typeof target[i] !== 'string')
                 return false;
@@ -57,9 +59,9 @@ function isStringOrStringArray (target, forbidEmptyArray) {
     return false;
 }
 
-function failWithError (code, additionalParams) {
+function failWithError (type, additionalParams) {
     var err = {
-        code:          code,
+        type:          type,
         stepName:      SETTINGS.get().CURRENT_TEST_STEP_NAME,
         __sourceIndex: sourceIndexTracker.currentIndex
     };
@@ -86,7 +88,7 @@ function ensureElementsExist (item, actionName, callback) {
 
             array = ensureArray(res);
 
-            if (res && !(serviceUtils.isJQueryObj(res) && !res.length) && array.length) {
+            if (res && !(isJQueryObj(res) && !res.length) && array.length) {
                 callback(array);
                 return true;
             }
@@ -116,16 +118,39 @@ function ensureElementsExist (item, actionName, callback) {
     window.setTimeout(function () {
         if (!success) {
             window.clearInterval(interval);
-            failWithError(ERRORS.API_EMPTY_FIRST_ARGUMENT, { action: actionName });
+            failWithError(ERROR_TYPE.emptyFirstArgument, { action: actionName });
         }
     }, ELEMENT_AVAILABILITY_WAITING_TIMEOUT);
 }
 
 function ensureElementVisibility (element, actionName, callback) {
     var success = false;
+    var tagName = element.tagName.toLowerCase();
 
-    if (positionUtils.isElementVisible(element) || element.tagName.toLowerCase() === 'option' ||
-        element.tagName.toLowerCase() === 'optgroup') {
+    if (tagName === 'option' || tagName === 'optgroup') {
+        var parentSelect = domUtils.getSelectParent(element);
+
+        if (!parentSelect) {
+            callback();
+            return;
+        }
+
+        var isOptionListExpanded = selectElement.isOptionListExpanded(parentSelect);
+        var selectSizeValue      = styleUtils.getSelectElementSize(parentSelect);
+
+        if (!isOptionListExpanded && selectSizeValue <= 1) {
+            failWithError(ERROR_TYPE.invisibleActionElement, {
+                element: domUtils.getElementDescription(element),
+                action:  actionName
+            });
+        }
+        else
+            callback();
+
+        return;
+    }
+
+    if (positionUtils.isElementVisible(element)) {
         callback();
         return;
     }
@@ -142,7 +167,7 @@ function ensureElementVisibility (element, actionName, callback) {
         if (!success) {
             window.clearInterval(interval);
 
-            failWithError(ERRORS.API_INVISIBLE_ACTION_ELEMENT, {
+            failWithError(ERROR_TYPE.invisibleActionElement, {
                 element: domUtils.getElementDescription(element),
                 action:  actionName
             });
@@ -154,7 +179,7 @@ function actionArgumentsIterator (actionName) {
     var runAction = null;
 
     var iterate = function (item, iterationCallback) {
-        if ($.isArray(item))
+        if (arrayUtils.isArray(item))
             extractArgs(item, iterationCallback);
         else if (typeof item === 'function') {
             ensureElementsExist(item, actionName, function (elementsArray) {
@@ -169,7 +194,7 @@ function actionArgumentsIterator (actionName) {
         else {
             var elementsArray = parseActionArgument(item, actionName);
             if (!elementsArray || elementsArray.length < 1)
-                failWithError(ERRORS.API_EMPTY_FIRST_ARGUMENT, { action: actionName });
+                failWithError(ERROR_TYPE.emptyFirstArgument, { action: actionName });
             else
                 runAction(elementsArray, iterationCallback);
         }
@@ -177,10 +202,10 @@ function actionArgumentsIterator (actionName) {
 
     var extractArgs = function (items, callback) {
         if (!items.length) {
-            failWithError(ERRORS.API_EMPTY_FIRST_ARGUMENT, { action: actionName });
+            failWithError(ERROR_TYPE.emptyFirstArgument, { action: actionName });
         }
         else {
-            window.async.forEachSeries(
+            async.forEachSeries(
                 items,
                 function (item, seriaCallback) {
                     iterate(item, seriaCallback);
@@ -228,14 +253,9 @@ export function parseActionArgument (item, actionName) {
         return [item];
     else if (actionName && actionName === 'select' && domUtils.isTextNode(item))
         return [item];
-    else if (typeof item === 'string') {
-        $(item).each(function () {
-            elements.push(this);
-        });
-
-        return elements;
-    }
-    else if (serviceUtils.isJQueryObj(item)) {
+    else if (typeof item === 'string')
+        return arrayUtils.toArray($(item));
+    else if (isJQueryObj(item)) {
         item.each(function () {
             elements.push(this);
         });
@@ -260,7 +280,7 @@ export function click (what, options) {
         function (element, callback, iframe) {
             ensureElementVisibility(element, 'click', function () {
                 function onerror (err) {
-                    failWithError(err.code, {
+                    failWithError(err.type, {
                         element: err.element,
                         action:  'click'
                     });
@@ -272,8 +292,8 @@ export function click (what, options) {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].click.playback.run(element, options ||
-                                                                                                    {}, callback, onerror);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].click.playback(element, options ||
+                                                                                                {}, callback, onerror);
                 else
                     clickPlaybackAutomation(element, options || {}, callback, onerror);
             });
@@ -295,8 +315,8 @@ export function rclick (what, options) {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].rclick.playback.run(element, options ||
-                                                                                                     {}, callback);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].rclick.playback(element, options ||
+                                                                                                 {}, callback);
                 else
                     rClickPlaybackAutomation(element, options || {}, callback);
             });
@@ -318,8 +338,8 @@ export function dblclick (what, options) {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].dblclick.playback.run(element, options ||
-                                                                                                       {}, callback);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].dblclick.playback(element, options ||
+                                                                                                   {}, callback);
                 else
                     dblClickPlaybackAutomation(element, options || {}, callback);
             });
@@ -336,19 +356,19 @@ export function drag (what) {
     var to = args.length > 2 && secondArgIsCoord ? { dragOffsetX: args[1], dragOffsetY: args[2] } : args[1];
 
     if (!to) {
-        failWithError(ERRORS.API_INCORRECT_DRAGGING_SECOND_ARGUMENT);
+        failWithError(ERROR_TYPE.incorrectDraggingSecondArgument);
         return;
     }
-    if (serviceUtils.isJQueryObj(to)) {
+    if (isJQueryObj(to)) {
         if (to.length < 1) {
-            failWithError(ERRORS.API_INCORRECT_DRAGGING_SECOND_ARGUMENT);
+            failWithError(ERROR_TYPE.incorrectDraggingSecondArgument);
             return;
         }
         else
             to = to[0];
     }
     else if (!domUtils.isDomElement(to) && (isNaN(parseInt(to.dragOffsetX)) || isNaN(parseInt(to.dragOffsetY)))) {
-        failWithError(ERRORS.API_INCORRECT_DRAGGING_SECOND_ARGUMENT);
+        failWithError(ERROR_TYPE.incorrectDraggingSecondArgument);
         return;
     }
 
@@ -365,8 +385,8 @@ export function drag (what) {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].drag.playback.run(element, to, options ||
-                                                                                                       {}, callback);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].drag.playback(element, to, options ||
+                                                                                                   {}, callback);
                 else
                     dragPlaybackAutomation(element, to, options || {}, callback);
             });
@@ -376,20 +396,20 @@ export function drag (what) {
 export function select () {
     var actionStarted = false,
         elements      = ensureArray(arguments[0]),
-        args          = $.makeArray(arguments).slice(1),
+        args          = arrayUtils.toArray(arguments).slice(1),
         secondArg     = null,
         options       = {},
         error         = false,
         commonParent  = null;
 
     if (!arguments[0])
-        failWithError(ERRORS.API_INCORRECT_SELECT_ACTION_ARGUMENTS);
+        failWithError(ERROR_TYPE.incorrectSelectActionArguments);
 
     if (args.length === 1) {
         //NOTE: second action argument is jquery object
-        if (serviceUtils.isJQueryObj(args[0])) {
+        if (isJQueryObj(args[0])) {
             if (args[0].length < 1) {
-                failWithError(ERRORS.API_INCORRECT_SELECT_ACTION_ARGUMENTS);
+                failWithError(ERROR_TYPE.incorrectSelectActionArguments);
                 return;
             }
             else
@@ -404,11 +424,10 @@ export function select () {
         if (styleUtils.isNotVisibleNode(secondArg))
             error = true;
         else {
-            options.startNode = serviceUtils.isJQueryObj(elements[0]) ? elements[0][0] : elements[0];
+            options.startNode = isJQueryObj(elements[0]) ? elements[0][0] : elements[0];
             options.endNode   = secondArg;
 
-            if (!domUtils.isContentEditableElement(options.startNode) ||
-                !domUtils.isContentEditableElement(options.endNode))
+            if (!domUtils.isContentEditableElement(options.startNode) || !domUtils.isContentEditableElement(options.endNode))
                 error = true;
             else {
                 //NOTE: We should find element for perform select action
@@ -426,17 +445,11 @@ export function select () {
             }
         }
     }
-    else {
-        $.each(args, function (index, value) {
-            if (isNaN(parseInt(value)) || (args.length > 1 && value < 0)) {
-                error = true;
-                return false;
-            }
-        });
-    }
+    else
+        error = arrayUtils.some(args, value => isNaN(parseInt(value)) || args.length > 1 && value < 0);
 
     if (error) {
-        failWithError(ERRORS.API_INCORRECT_SELECT_ACTION_ARGUMENTS);
+        failWithError(ERROR_TYPE.incorrectSelectActionArguments);
         return;
     }
 
@@ -466,7 +479,7 @@ export function select () {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].select.playback.run(element, options, callback);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].select.playback(element, options, callback);
                 else
                     selectPlaybackAutomation(element, options, callback);
             });
@@ -475,7 +488,7 @@ export function select () {
 
 export function type (what, text, options) {
     if (!text) {
-        failWithError(ERRORS.API_EMPTY_TYPE_ACTION_ARGUMENT);
+        failWithError(ERROR_TYPE.emptyTypeActionArgument);
         return;
     }
 
@@ -493,8 +506,8 @@ export function type (what, text, options) {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].type.playback.run(element, text, options ||
-                                                                                                         {}, callback);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].type.playback(element, text, options ||
+                                                                                                     {}, callback);
                 else
                     typePlaybackAutomation(element, text, options || {}, callback);
             });
@@ -516,7 +529,7 @@ export function hover (what, options) {
                 }
 
                 if (iframe)
-                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].hover.playback.run(element, callback);
+                    iframe.contentWindow[automation.AUTOMATION_RUNNERS].hover.playback(element, callback);
                 else
                     hoverPlaybackAutomation(element, options || {}, callback);
             });
@@ -529,7 +542,7 @@ export function press () {
         pressActionArgumentsIterator().run,
         function (keys, callback) {
             if (keyCharUtils.parseKeysString(keys).error)
-                failWithError(ERRORS.API_INCORRECT_PRESS_ACTION_ARGUMENT);
+                failWithError(ERROR_TYPE.incorrectPressActionArgument);
 
             else
                 pressPlaybackAutomation(keys, callback);
@@ -557,23 +570,21 @@ export function wait (ms, condition) {
     condition = typeof(condition) === 'function' ? condition : null;
 
     if (typeof ms !== 'number' || ms < 0) {
-        failWithError(ERRORS.API_INCORRECT_WAIT_ACTION_MILLISECONDS_ARGUMENT);
+        failWithError(ERROR_TYPE.incorrectWaitActionMillisecondsArgument);
         return;
     }
 
     stepIterator.asyncAction(function (iteratorCallback) {
-        stepIterator.expectInactivity(ms, function () {
-            function onConditionReached () {
-                window.clearTimeout(timeout);
-                stopConditionCheck();
-                iteratorCallback();
-            }
+        function onConditionReached () {
+            window.clearTimeout(timeout);
+            stopConditionCheck();
+            iteratorCallback();
+        }
 
-            var timeout = window.setTimeout(onConditionReached, ms || 0);
+        var timeout = window.setTimeout(onConditionReached, ms || 0);
 
-            if (condition)
-                startConditionCheck(condition, onConditionReached);
-        });
+        if (condition)
+            startConditionCheck(condition, onConditionReached);
     });
 }
 
@@ -582,7 +593,7 @@ export function waitFor (event, timeout) {
         timeoutExceeded = false;
 
     if (typeof event !== 'function' && !waitForElements) {
-        failWithError(ERRORS.API_INCORRECT_WAIT_FOR_ACTION_EVENT_ARGUMENT);
+        failWithError(ERROR_TYPE.incorrectWaitForActionEventArgument);
         return;
     }
 
@@ -590,7 +601,7 @@ export function waitFor (event, timeout) {
         timeout = WAIT_FOR_DEFAULT_TIMEOUT;
 
     if (typeof timeout !== 'number' || timeout < 0) {
-        failWithError(ERRORS.API_INCORRECT_WAIT_FOR_ACTION_TIMEOUT_ARGUMENT);
+        failWithError(ERROR_TYPE.incorrectWaitForActionTimeoutArgument);
         return;
     }
 
@@ -602,7 +613,7 @@ export function waitFor (event, timeout) {
                 stopConditionCheck();
 
             timeoutExceeded = true;
-            failWithError(ERRORS.API_WAIT_FOR_ACTION_TIMEOUT_EXCEEDED);
+            failWithError(ERROR_TYPE.waitForActionTimeoutExceeded);
         }, timeout);
 
         function onConditionReached () {
@@ -617,41 +628,38 @@ export function waitFor (event, timeout) {
             iteratorCallback();
         }
 
+        var condition = null;
 
-        stepIterator.expectInactivity(timeout, function () {
-            var condition = null;
-
-            if (waitForElements) {
-                if (typeof event === 'string') {
-                    condition = function () {
-                        return !!$(event).length;
-                    };
-                }
-                else {
-                    condition = function () {
-                        var elementsExist = true;
-
-                        for (var i = 0; i < event.length; i++) {
-                            if (!$(event[i]).length) {
-                                elementsExist = false;
-                                break;
-                            }
-                        }
-
-                        return elementsExist;
-                    };
-                }
-
-                startConditionCheck(condition, onConditionReached);
+        if (waitForElements) {
+            if (typeof event === 'string') {
+                condition = function () {
+                    return !!$(event).length;
+                };
             }
             else {
-                stepIterator.callWithSharedDataContext(function () {
-                    event.call(this, function () {
-                        onConditionReached();
-                    });
-                });
+                condition = function () {
+                    var elementsExist = true;
+
+                    for (var i = 0; i < event.length; i++) {
+                        if (!$(event[i]).length) {
+                            elementsExist = false;
+                            break;
+                        }
+                    }
+
+                    return elementsExist;
+                };
             }
-        });
+
+            startConditionCheck(condition, onConditionReached);
+        }
+        else {
+            stepIterator.callWithSharedDataContext(function () {
+                event.call(this, function () {
+                    onConditionReached();
+                });
+            });
+        }
     });
 }
 
@@ -659,7 +667,7 @@ export function navigateTo (url) {
     var NAVIGATION_DELAY = 1000;
 
     stepIterator.asyncAction(function (iteratorCallback) {
-        window[jsProcessor.SET_PROPERTY_METH_NAME](window, 'location', url);
+        hammerhead.navigateTo(url);
 
         //NOTE: give browser some time to navigate
         window.setTimeout(iteratorCallback, NAVIGATION_DELAY);
@@ -671,14 +679,14 @@ export function upload (what, path) {
         elements      = ensureArray(what);
 
     if (!isStringOrStringArray(path) && path)
-        failWithError(ERRORS.API_UPLOAD_INVALID_FILE_PATH_ARGUMENT);
+        failWithError(ERROR_TYPE.uploadInvalidFilePathArgument);
 
     stepIterator.asyncActionSeries(
         elements,
         actionArgumentsIterator('upload').run,
         function (element, callback) {
             if (!domUtils.isFileInput(element))
-                failWithError(ERRORS.API_UPLOAD_ELEMENT_IS_NOT_FILE_INPUT);
+                failWithError(ERROR_TYPE.uploadElementIsNotFileInput);
 
             else {
                 if (!actionStarted) {
@@ -686,28 +694,27 @@ export function upload (what, path) {
                     onTargetWaitingFinished();
                 }
 
-                hhUpload(element, path, function (errs) {
-                    if (errs.length) {
-                        var errPaths = errs.map(function (err) {
-                            return err.filePath;
-                        });
+                hammerhead.doUpload(element, path)
+                    .then((errs) => {
+                        if (errs.length) {
+                            var errPaths = arrayUtils.map(errs, err => err.filePath);
 
-                        failWithError(ERRORS.API_UPLOAD_CAN_NOT_FIND_FILE_TO_UPLOAD, { filePaths: errPaths });
-                    }
+                            failWithError(ERROR_TYPE.uploadCanNotFindFileToUpload, { filePaths: errPaths });
+                        }
 
-                    else
-                        callback();
-                });
+                        else
+                            callback();
+                    });
             }
         }
     );
 }
 
-export function screenshot () {
+export function screenshot (filePath) {
     stepIterator.asyncAction(function (iteratorCallback) {
         stepIterator.takeScreenshot(function () {
             iteratorCallback();
-        }, false);
+        }, filePath);
     });
 }
 
@@ -717,4 +724,18 @@ export function setElementAvailabilityWaitingTimeout (ms) {
 }
 
 //NOTE: add sourceIndex wrapper
-sourceIndexTracker.wrapTrackableMethods(exports, CONST.ACTION_FUNC_NAMES);
+sourceIndexTracker.wrapTrackableMethods(exports, [
+    'click',
+    'rclick',
+    'dblclick',
+    'drag',
+    'type',
+    'wait',
+    'waitFor',
+    'hover',
+    'press',
+    'select',
+    'navigateTo',
+    'upload',
+    'screenshot'
+]);

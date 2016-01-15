@@ -1,12 +1,6 @@
-import * as hammerheadAPI from '../deps/hammerhead';
+import hammerhead from '../deps/hammerhead';
 import testCafeCore from '../deps/testcafe-core';
 
-var hhBind        = hammerheadAPI.on;
-var XHR_SEND      = hammerheadAPI.XHR_SEND;
-var XHR_ERROR     = hammerheadAPI.XHR_ERROR;
-var XHR_COMPLETED = hammerheadAPI.XHR_COMPLETED;
-
-var ERRORS       = testCafeCore.ERRORS;
 var serviceUtils = testCafeCore.serviceUtils;
 
 
@@ -55,7 +49,13 @@ function onRequestsCollected () {
 
     if (barrierCtx.reqCount) {
         barrierCtx.watchdog = window.setTimeout(function () {
-            eventEmitter.emit(XHR_BARRIER_ERROR, { code: ERRORS.XHR_REQUEST_TIMEOUT });
+            //NOTE: previously this error used in possible fail causes, which are R.I.P. now.
+            //So we just through error to the console for the debugging purposes. In IE9 console.log
+            //is defined only if dev tools are open.
+            if (window.console && window.console.log)
+                window.console.log('TestCafe encountered hanged XHR on page.');
+
+            eventEmitter.emit(XHR_BARRIER_ERROR);
             barrierCtx.callback();
         }, BARRIER_TIMEOUT);
     }
@@ -83,31 +83,37 @@ export function init () {
         pageInitialReqsComplete = true;
     });
 
-    hhBind(XHR_SEND, function (e) {
+    function onXhrFinish (xhr) {
+        if (removeXhrFromQueue(xhr))
+            barrierCtx.reqCount--;
+
+        if (!barrierCtx.collectingReqs && !barrierCtx.reqCount)
+            barrierCtx.callback();
+    }
+
+    hammerhead.on(hammerhead.EVENTS.xhrSend, function (e) {
         if (barrierCtx) {
             barrierCtx.reqCount++;
             barrierCtx.requests.push(e.xhr);
         }
     });
 
-    hhBind(XHR_ERROR, function (e) {
+    hammerhead.on(hammerhead.EVENTS.xhrError, function (e) {
         //NOTE: previously this error used in possible fail causes, which are R.I.P. now.
-        //So we just through errot to the console for the debugging purposes. In IE9 console.log
+        //So we just through error to the console for the debugging purposes. In IE9 console.log
         //is defined only if dev tools are open.
         if (window.console && window.console.log)
             window.console.log('TestCafe encountered XHR error on page: ' + e.err);
         events.emit(XHR_BARRIER_ERROR, e.err);
+
+        onXhrFinish(e.xhr);
     });
 
-    hhBind(XHR_COMPLETED, function (e) {
+    hammerhead.on(hammerhead.EVENTS.xhrCompleted, function (e) {
         //NOTE: let last real xhr-handler finish it's job and try to obtain any additional requests
         //if they were initiated by this handler
         window.setTimeout(function () {
-            if (removeXhrFromQueue(e.xhr))
-                barrierCtx.reqCount--;
-
-            if (!barrierCtx.collectingReqs && !barrierCtx.reqCount)
-                barrierCtx.callback();
+            onXhrFinish(e.xhr);
 
         }, ADDITIONAL_REQUESTS_COLLECTION_DELAY);
     });

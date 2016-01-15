@@ -1,46 +1,53 @@
-import { Proxy } from 'hammerhead';
-import BrowserConnectionGateway from './browser-connection/gateway';
-import BrowserConnection from './browser-connection';
-import Runner from './runner';
-import read from './utils/read-file-relative';
+import TestCafe from './testcafe';
+import ReporterPluginHost from './reporter/plugin-host';
+import * as endpointUtils from 'endpoint-utils';
+import { MESSAGE, getText } from './messages';
 
+// Validations
+async function getValidHostname (hostname) {
+    if (hostname) {
+        var valid = await endpointUtils.isMyHostname(hostname);
 
-// Const
-const CORE_SCRIPT   = read('./client/core/index.js');
-const RUNNER_SCRIPT = read('./client/runner/index.js');
-const UI_SCRIPT     = read('./client/ui/index.js');
-const UI_STYLE      = read('./client/ui/styles.css');
-const UI_SPRITE     = read('./client/ui/sprite.png', true);
-
-
-// TestCafe
-export default class TestCafe {
-    constructor (port1, port2, hostname = '127.0.0.1') {
-        this.proxy                    = new Proxy(hostname, port1, port2);
-        this.browserConnectionGateway = new BrowserConnectionGateway(this.proxy);
-
-        this._registerAssets();
+        if (!valid)
+            throw new Error(getText(MESSAGE.invalidHostname, hostname));
     }
+    else
+        hostname = await endpointUtils.getMyHostname();
 
-    _registerAssets () {
-        this.proxy.GET('/testcafe-core.js', { content: CORE_SCRIPT, contentType: 'application/x-javascript' });
-        this.proxy.GET('/testcafe-runner.js', { content: RUNNER_SCRIPT, contentType: 'application/x-javascript' });
-        this.proxy.GET('/testcafe-ui.js', { content: UI_SCRIPT, contentType: 'application/x-javascript' });
-        this.proxy.GET('/testcafe-ui-styles.css', { content: UI_STYLE, contentType: 'text/css' });
-        this.proxy.GET('/testcafe-ui-sprite.png', { content: UI_SPRITE, contentType: 'image/png' });
-    }
-
-
-    // API
-    createBrowserConnection () {
-        return new BrowserConnection(this.browserConnectionGateway);
-    }
-
-    createRunner () {
-        return new Runner(this.proxy, this.browserConnectionGateway);
-    }
-
-    close () {
-        this.proxy.close();
-    }
+    return hostname;
 }
+
+async function getValidPort (port) {
+    if (port) {
+        var isFree = await endpointUtils.isFreePort(port);
+
+        if (!isFree)
+            throw new Error(getText(MESSAGE.portIsNotFree, port));
+    }
+    else
+        port = await endpointUtils.getFreePort();
+
+    return port;
+}
+
+// API
+async function createTestCafe (hostname, port1, port2) {
+    [hostname, port1, port2] = await Promise.all([
+        getValidHostname(hostname),
+        getValidPort(port1),
+        getValidPort(port2)
+    ]);
+
+    return new TestCafe(hostname, port1, port2);
+}
+
+// Plugin testing utils
+createTestCafe.pluginTestingUtils = {
+    buildReporterPlugin (pluginFactory, outStream) {
+        var plugin = pluginFactory();
+
+        return new ReporterPluginHost(plugin, outStream);
+    }
+};
+
+export default createTestCafe;

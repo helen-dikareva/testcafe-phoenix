@@ -1,9 +1,8 @@
-var hammerhead = window.getTestCafeModule('hammerhead');
-var browser    = hammerhead.Util.Browser;
-var hh_event      = hammerhead.Util.Event;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
-var position     = testCafeCore.get('./util/position');
+var position     = testCafeCore.get('./utils/position');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -13,6 +12,7 @@ var StepIterator   = testCafeRunner.get('./step-iterator');
 var testCafeUI = window.getTestCafeModule('testCafeUI');
 var cursor     = testCafeUI.get('./cursor');
 
+var RIGHT_BUTTON_WHICH_PARAMETER = hammerhead.utils.event.WHICH_PARAMETER.rightButton;
 
 automation.init();
 cursor.init();
@@ -21,7 +21,7 @@ var stepIterator = new StepIterator();
 actionsAPI.init(stepIterator);
 
 var correctTestWaitingTime = function (time) {
-    if (browser.isTouchDevice && browser.isMozilla)
+    if (browserUtils.isTouchDevice && browserUtils.isFirefox)
         return time * 2;
 
     return time;
@@ -94,7 +94,7 @@ $(document).ready(function () {
         },
 
         startNext          = function () {
-            if (browser.isIE) {
+            if (browserUtils.isIE) {
                 removeTestElements();
                 window.setTimeout(start, 30);
             }
@@ -116,7 +116,7 @@ $(document).ready(function () {
     });
 
     QUnit.testDone(function () {
-        if (!browser.isIE)
+        if (!browserUtils.isIE)
             removeTestElements();
     });
 
@@ -129,6 +129,7 @@ $(document).ready(function () {
             mouseupRaised     = false,
             clickRaised       = false,
             contextmenuRaised = false;
+
         runAsyncTest(
             function () {
                 $input = addInputElement('button', 'button1', Math.floor(Math.random() * 100),
@@ -137,12 +138,12 @@ $(document).ready(function () {
                 window.setTimeout(function () {
                     $input.mousedown(function (e) {
                         mousedownRaised = true;
-                        ok(e.which, hh_event.WHICH_PARAMETER.RIGHT_BUTTON);
+                        ok(e.which, RIGHT_BUTTON_WHICH_PARAMETER);
                         ok(!mouseupRaised && !clickRaised && !contextmenuRaised, 'mousedown event was raised first');
                     });
                     $input.mouseup(function (e) {
                         mouseupRaised = true;
-                        ok(e.which, hh_event.WHICH_PARAMETER.RIGHT_BUTTON);
+                        ok(e.which, RIGHT_BUTTON_WHICH_PARAMETER);
                         ok(mousedownRaised && !clickRaised && !contextmenuRaised, 'mouseup event was raised second');
                     });
                     $input.click(function () {
@@ -150,8 +151,7 @@ $(document).ready(function () {
                     });
                     $input.contextmenu(function (e) {
                         contextmenuRaised = true;
-                        ok(e.which, hh_event.WHICH_PARAMETER.RIGHT_BUTTON);
-                        deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
+                        ok(e.which, RIGHT_BUTTON_WHICH_PARAMETER);
                         ok(mousedownRaised && mouseupRaised && !clickRaised, 'contextmenu event was raised third ');
                     });
                     actionsAPI.rclick($input[0]);
@@ -161,7 +161,6 @@ $(document).ready(function () {
                 ok(mousedownRaised && mousedownRaised && !clickRaised && contextmenuRaised, 'mouse events were raised');
                 equal(actionTargetWaitingCounter, 1);
                 equal(actionRunCounter, 1);
-                expect(10);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );
@@ -172,6 +171,7 @@ $(document).ready(function () {
             mousedownRaised = false,
             mouseupRaised   = false,
             contextmenu     = false;
+
         runAsyncTest(
             function () {
                 $el = addInputElement('button', 'button1', Math.floor(Math.random() * 100),
@@ -181,7 +181,7 @@ $(document).ready(function () {
                     mousedownRaised = true;
 
                     equal(e.button, 2);
-                    if (browser.isIE || browser.isMozilla)
+                    if (browserUtils.isIE || browserUtils.isFirefox)
                         equal(e.buttons, 2);
 
                     ok(!mouseupRaised && !contextmenu, 'mousedown event was raised first');
@@ -190,7 +190,7 @@ $(document).ready(function () {
                     mouseupRaised = true;
 
                     equal(e.button, 2);
-                    if (browser.isIE || browser.isMozilla)
+                    if (browserUtils.isIE || browserUtils.isFirefox)
                         equal(e.buttons, 2);
 
                     ok(mousedownRaised && !contextmenu, 'mouseup event was raised second');
@@ -199,20 +199,19 @@ $(document).ready(function () {
                     contextmenu = true;
 
                     equal(e.button, 2);
-                    if (browser.isIE || browser.isMozilla)
+                    if (browserUtils.isIE || browserUtils.isFirefox)
                         equal(e.buttons, 2);
 
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     ok(mousedownRaised && mouseupRaised, 'click event was raised third ');
                 });
 
                 var pointerHandler = function (e) {
-                    equal(e.pointerType, browser.version > 10 ? 'mouse' : 4);
+                    equal(e.pointerType, browserUtils.version > 10 ? 'mouse' : 4);
                     equal(e.button, 2);
                     equal(e.buttons, 2);
                 };
 
-                if (browser.isIE && browser.version > 11) {
+                if (browserUtils.isIE && browserUtils.version > 11) {
                     $el[0].onpointerdown = pointerHandler;
                     $el[0].onpointerup   = pointerHandler;
                 }
@@ -225,12 +224,12 @@ $(document).ready(function () {
             },
             function () {
                 ok(mousedownRaised && mousedownRaised && contextmenu, 'mouse events were raised');
-                if (browser.isMozilla || browser.isIE9)
-                    expect(11);
-                else if (browser.isIE)
-                    expect(17);
+                if (browserUtils.isFirefox || browserUtils.isIE9)
+                    expect(10);
+                else if (browserUtils.isIE)
+                    expect(16);
                 else
-                    expect(8);
+                    expect(7);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );

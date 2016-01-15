@@ -1,13 +1,11 @@
-var expect            = require('chai').expect;
-var Promise           = require('promise');
-var request           = require('request');
-var TestCafe          = require('../../lib/');
-var BrowserConnection = require('../../lib/browser-connection');
-var COMMAND           = require('../../lib/browser-connection/command');
+var expect         = require('chai').expect;
+var Promise        = require('pinkie');
+var promisify      = require('../../lib/utils/promisify');
+var request        = require('request');
+var createTestCafe = require('../../lib/');
+var COMMAND        = require('../../lib/browser-connection/command');
 
-
-var promisedRequest = Promise.denodeify(request);
-
+var promisedRequest = promisify(request);
 
 describe('Browser connection', function () {
     var testCafe   = null;
@@ -16,7 +14,10 @@ describe('Browser connection', function () {
 
     // Fixture setup/teardown
     before(function () {
-        testCafe = new TestCafe(1335, 1336);
+        return createTestCafe('127.0.0.1', 1335, 1336)
+            .then(function (tc) {
+                testCafe = tc;
+            });
     });
 
     after(function () {
@@ -35,7 +36,7 @@ describe('Browser connection', function () {
 
 
     // Tests
-    it('Should fire "ready" event and redirect to idle page once established', function (done) {
+    it('Should fire "ready" event and redirect to idle page once established', function () {
         var eventFired = false;
 
         connection.on('ready', function () {
@@ -51,38 +52,33 @@ describe('Browser connection', function () {
             }
         };
 
-        request(options, function (err, res) {
-            expect(eventFired).to.be.true;
-            expect(connection.ready).to.be.true;
-            expect(connection.userAgent.toAgent()).eql('Chrome 41.0.2227');
-            expect(res.statusCode).eql(302);
-            expect(res.headers['location']).eql(connection.idleUrl);
-
-            done();
-        });
+        return promisedRequest(options)
+            .then(function (res) {
+                expect(eventFired).to.be.true;
+                expect(connection.ready).to.be.true;
+                expect(connection.userAgent).eql('Chrome 41.0.2227 / Mac OS X 10.10.1');
+                expect(res.statusCode).eql(302);
+                expect(res.headers['location']).eql(connection.idleUrl);
+            });
     });
 
-    it('Should respond with error if connection was established twice', function (done) {
-        promisedRequest(connection.url)
+    it('Should respond with error if connection was established twice', function () {
+        return promisedRequest(connection.url)
             .then(function () {
                 return promisedRequest(connection.url);
             })
             .then(function (res) {
                 expect(res.statusCode).eql(500);
                 expect(res.body).eql('The connection is already established.');
-                done();
-            })
-            .catch(done);
+            });
     });
 
     it('Should fire "error" event on browser disconnection', function (done) {
-        var savedHeartbeatTimeout = BrowserConnection.HEARTBEAT_TIMEOUT;
+        connection.HEARTBEAT_TIMEOUT = 0;
 
-        BrowserConnection.HEARTBEAT_TIMEOUT = 0;
-
-        connection.on('error', function (msg) {
-            expect(msg).eql('The Chrome 41.0.2227 / Mac OS X 10.10.1 browser disconnected. This problem may ' +
-                            'appear when a browser hangs or is closed, or due to network issues.');
+        connection.on('error', function (error) {
+            expect(error.message).eql('The Chrome 41.0.2227 / Mac OS X 10.10.1 browser disconnected. This problem may ' +
+                                      'appear when a browser hangs or is closed, or due to network issues.');
             done();
         });
 
@@ -95,12 +91,10 @@ describe('Browser connection', function () {
             }
         };
 
-        request(options, function () {
-            BrowserConnection.HEARTBEAT_TIMEOUT = savedHeartbeatTimeout;
-        });
+        request(options);
     });
 
-    it('Should provide status', function (done) {
+    it('Should provide status', function () {
         function createBrowserJobMock (urls) {
             return {
                 popNextTestRunUrl: function () {
@@ -126,7 +120,7 @@ describe('Browser connection', function () {
             return promisedRequest(connection.statusUrl);
         }
 
-        promisedRequest(connection.url)
+        return promisedRequest(connection.url)
 
             .then(queryStatus)
             .then(function (res) {
@@ -145,14 +139,11 @@ describe('Browser connection', function () {
 
             .then(queryStatus)
             .then(function (res) {
-                expect(JSON.parse(res.body)).eql({ cmd: COMMAND.idle });
-                done();
-            })
-
-            .catch(done);
+                expect(JSON.parse(res.body)).eql({ cmd: COMMAND.idle, url: connection.idleUrl });
+            });
     });
 
-    it('Should respond to the service queries with error if not ready', function (done) {
+    it('Should respond to the service queries with error if not ready', function () {
         var testCases = [
             connection.heartbeatUrl,
             connection.idleUrl,
@@ -166,11 +157,7 @@ describe('Browser connection', function () {
             });
         });
 
-        Promise.all(testCases)
-            .then(function () {
-                done();
-            })
-            .catch(done);
+        return Promise.all(testCases);
     });
 });
 

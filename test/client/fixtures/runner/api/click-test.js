@@ -1,12 +1,11 @@
-var hammerhead = window.getTestCafeModule('hammerhead');
-var browser    = hammerhead.Util.Browser;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
-var testCafeCore = window.getTestCafeModule('testCafeCore');
-var SETTINGS     = testCafeCore.get('./settings').get();
-var ERRORS       = testCafeCore.get('./errors');
-var DOM          = testCafeCore.get('./util/dom');
-var style        = testCafeCore.get('./util/style');
-var position     = testCafeCore.get('./util/position');
+var testCafeCore  = window.getTestCafeModule('testCafeCore');
+var SETTINGS      = testCafeCore.get('./settings').get();
+var ERROR_TYPE    = testCafeCore.ERROR_TYPE;
+var styleUtils    = testCafeCore.get('./utils/style');
+var positionUtils = testCafeCore.get('./utils/position');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -24,7 +23,7 @@ var stepIterator = new StepIterator();
 actionsAPI.init(stepIterator);
 
 var correctTestWaitingTime = function (time) {
-    if (browser.isTouchDevice && browser.isMozilla)
+    if (browserUtils.isTouchDevice && browserUtils.isFirefox)
         return time * 2;
 
     return time;
@@ -66,7 +65,7 @@ $(document).ready(function () {
 
     stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
         stepIterator.state.stoppedOnFail = false;
-        currentErrorCode                 = err.code;
+        currentErrorType                 = err.type;
         currentActionSourceIndex         = err.__sourceIndex;
 
         if (err.element)
@@ -74,7 +73,7 @@ $(document).ready(function () {
     });
 
     var $el                      = null,
-        currentErrorCode         = null,
+        currentErrorType         = null,
         currentErrorElement      = null,
         currentActionSourceIndex = null,
         //constants
@@ -148,7 +147,7 @@ $(document).ready(function () {
         },
 
         startNext                = function () {
-            if (browser.isIE) {
+            if (browserUtils.isIE) {
                 removeTestElements();
                 window.setTimeout(start, 30);
             }
@@ -175,11 +174,11 @@ $(document).ready(function () {
     });
 
     QUnit.testDone(function () {
-        if (!browser.isIE)
+        if (!browserUtils.isIE)
             removeTestElements();
 
         SETTINGS.ENABLE_SOURCE_INDEX = false;
-        currentErrorCode             = null;
+        currentErrorType             = null;
         currentErrorElement          = null;
         currentActionSourceIndex     = null;
     });
@@ -192,16 +191,12 @@ $(document).ready(function () {
                 $el.click(function () {
                     clicked = true;
                 });
-                $el.bind('mousedown', function () {
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter($el[0]), 'check cursor position');
-                });
                 actionsAPI.click($el[0]);
             },
             function () {
                 ok(clicked, 'click raised');
                 equal(actionTargetWaitingCounter, 1);
                 equal(actionRunCounter, 1);
-                expect(4);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );
@@ -214,14 +209,10 @@ $(document).ready(function () {
                 $el.click(function () {
                     clicked = true;
                 });
-                $el.bind('mousedown', function () {
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter($el[0]), 'check cursor position');
-                });
                 actionsAPI.click($el);
             },
             function () {
                 ok(clicked, 'click raised');
-                expect(2);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );
@@ -235,9 +226,6 @@ $(document).ready(function () {
                 var $elements = $('.button')
                     .click(function () {
                         clicksCount++;
-                    })
-                    .bind('mousedown', function () {
-                        deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     });
                 actionsAPI.click($elements);
             },
@@ -261,12 +249,10 @@ $(document).ready(function () {
                 });
                 var $el2 = addInputElement('button', 'button2', 150, 150);
                 $el.click(function (e) {
-                    firstElementClickRaised = true
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
+                    firstElementClickRaised = true;
                 });
                 $el2.click(function (e) {
-                    secondElementClickRaised = true
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
+                    secondElementClickRaised = true;
                 });
                 actionsAPI.click([$el[0], $el2[0]]);
             },
@@ -292,9 +278,6 @@ $(document).ready(function () {
                 $('.' + TEST_ELEMENT_CLASS)
                     .click(function () {
                         clicksCount++;
-                    })
-                    .bind('mousedown', function () {
-                        deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     });
                 actionsAPI.click([$('.button'), $el3]);
             },
@@ -309,7 +292,7 @@ $(document).ready(function () {
         SETTINGS.ENABLE_SOURCE_INDEX = true;
         actionsAPI.click($('#nonExistentElement'), '#24');
         setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_EMPTY_FIRST_ARGUMENT);
+            equal(currentErrorType, ERROR_TYPE.emptyFirstArgument);
             equal(currentActionSourceIndex, 24);
             startNext();
         }, ERROR_WAITING_TIMEOUT);
@@ -321,8 +304,8 @@ $(document).ready(function () {
         actionsAPI.click($el, '#32');
         setTimeout(function () {
             $el.css('visibility', '');
-            equal(currentErrorCode, ERRORS.API_INVISIBLE_ACTION_ELEMENT);
-            equal(currentErrorElement, DOM.getElementDescription($el[0]));
+            equal(currentErrorType, ERROR_TYPE.invisibleActionElement);
+            equal(currentErrorElement, '&lt;input id=&quot;button1&quot; class=&quot;button testElement&quot;&gt;');
             equal(currentActionSourceIndex, 32);
 
             startNext();
@@ -334,21 +317,15 @@ $(document).ready(function () {
             thirdElementClicked  = false,
             newTestClass         = 'newTestClass';
 
-        $('#button1').click(function () {
-            deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
-        });
-
         $el.click(function () {
-            addInputElement('button', 'button2', 150, 150).addClass(newTestClass).click(function () {
-                secondElementClicked = true;
-                deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
-            });
+            addInputElement('button', 'button2', 150, 150)
+                .addClass(newTestClass)
+                .click(function () {
+                    secondElementClicked = true;
+                });
 
             addInputElement('button', 'button3', 200, 200)
                 .addClass(newTestClass)
-                .bind('mousedown', function () {
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
-                })
                 .bind('click', function () {
                     thirdElementClicked = true;
                 });
@@ -360,7 +337,6 @@ $(document).ready(function () {
             function () {
                 ok(secondElementClicked, 'second element clicked');
                 ok(thirdElementClicked, 'third element clicked');
-                expect(5);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT));
     });
@@ -374,7 +350,7 @@ $(document).ready(function () {
         actionsAPI.click([$el, '#nonExistentElementId'], '#271');
 
         setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_EMPTY_FIRST_ARGUMENT);
+            equal(currentErrorType, ERROR_TYPE.emptyFirstArgument);
             equal(currentActionSourceIndex, 271);
 
             startNext();
@@ -389,11 +365,9 @@ $(document).ready(function () {
         $el.click(function () {
             addInputElement('button', 'button2', 150, 150).addClass(newTestClass).click(function () {
                 secondElementClicked = true;
-                deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
             });
             addInputElement('button', 'button3', 200, 200).addClass(newTestClass).click(function () {
                 thirdElementClicked = true;
-                deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
             });
         });
         runAsyncTest(function () {
@@ -427,20 +401,18 @@ $(document).ready(function () {
                 });
                 $el.click(function () {
                     clickRaised = true;
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     ok(mousedownRaised && mouseupRaised, 'click event was raised third ');
                 });
                 actionsAPI.click($el[0]);
             },
             function () {
                 ok(mousedownRaised && mousedownRaised && clickRaised, 'mouse events were raised');
-                expect(5);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );
     });
 
-    if (!browser.hasTouchEvents) {
+    if (!browserUtils.hasTouchEvents) {
         asyncTest('over and move events on elements during moving', function () {
             var overed  = false,
                 entered = false,
@@ -485,8 +457,8 @@ $(document).ready(function () {
                     $div3            = addContainer(400, 620, $div2),
                     $div4            = addContainer(350, 1230, $div3),
                     offsetY          = 2350,
-                    containerBorders = style.getBordersWidth($div4[0]),
-                    containerPadding = style.getElementPadding($div4[0]);
+                    containerBorders = styleUtils.getBordersWidth($div4[0]),
+                    containerPadding = styleUtils.getElementPadding($div4[0]);
 
                 createDiv().addClass(TEST_ELEMENT_CLASS)
                     .css({
@@ -528,8 +500,8 @@ $(document).ready(function () {
                     $div3            = addContainer(400, 620, $div2),
                     $div4            = addContainer(350, 1230, $div3),
                     offsetY          = 50,
-                    containerBorders = style.getBordersWidth($div4[0]),
-                    containerPadding = style.getElementPadding($div4[0]);
+                    containerBorders = styleUtils.getBordersWidth($div4[0]),
+                    containerPadding = styleUtils.getElementPadding($div4[0]);
 
                 createDiv().addClass(TEST_ELEMENT_CLASS)
                     .css({
@@ -583,14 +555,13 @@ $(document).ready(function () {
                     .css({ marginTop: '400px', marginLeft: '80px' })
                     .bind('mousedown', function () {
                         clicked = true;
-                        deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     })
                     .appendTo($div);
+
                 actionsAPI.click($button[0]);
             },
             function () {
                 ok(clicked, 'click was raised');
-                expect(2);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );
@@ -603,9 +574,6 @@ $(document).ready(function () {
                 $el.css({ 'marginTop': '1000px' })
                     .click(function () {
                         clicked = true;
-                    })
-                    .bind('mousedown', function () {
-                        deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     });
                 //moving scroll to start position for a next test
                 actionsAPI.click([$el[0], addDiv(200, 500)]);
@@ -641,7 +609,6 @@ $(document).ready(function () {
             el              = $el[0];
         $el.click(function () {
             clicksCount++;
-            deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
         });
         asyncActionCallback = function () {
             asyncActionCallback = function () {
@@ -676,7 +643,6 @@ $(document).ready(function () {
                     ctrl  = e.ctrlKey;
                     shift = e.shiftKey;
                     meta  = e.metaKey;
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                 });
                 actionsAPI.click($input[0], {
                     alt:   true,
@@ -707,7 +673,6 @@ $(document).ready(function () {
                     e              = e || window.event;
                     e.cancelBubble = true;
                     btnClicked     = true;
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                 };
                 var $div       = addDiv(100, 100)
                     .width(150)
@@ -929,7 +894,7 @@ $(document).ready(function () {
                     mousedownRaised = true;
 
                     equal(e.button, 0);
-                    if (browser.isIE || browser.isMozilla)
+                    if (browserUtils.isIE || browserUtils.isFirefox)
                         equal(e.buttons, 1);
 
                     ok(!mouseupRaised && !clickRaised, 'mousedown event was raised first');
@@ -938,7 +903,7 @@ $(document).ready(function () {
                     mouseupRaised = true;
 
                     equal(e.button, 0);
-                    if (browser.isIE || browser.isMozilla)
+                    if (browserUtils.isIE || browserUtils.isFirefox)
                         equal(e.buttons, 1);
 
                     ok(mousedownRaised && !clickRaised, 'mouseup event was raised second');
@@ -947,20 +912,19 @@ $(document).ready(function () {
                     clickRaised = true;
 
                     equal(e.button, 0);
-                    if (browser.isIE || browser.isMozilla)
+                    if (browserUtils.isIE || browserUtils.isFirefox)
                         equal(e.buttons, 1);
 
-                    deepEqual(cursor.getAbsolutePosition(), position.findCenter(this), 'check cursor position');
                     ok(mousedownRaised && mouseupRaised, 'click event was raised third ');
                 });
 
                 var pointerHandler = function (e) {
-                    equal(e.pointerType, browser.version > 10 ? 'mouse' : 4);
+                    equal(e.pointerType, browserUtils.version > 10 ? 'mouse' : 4);
                     equal(e.button, 0);
                     equal(e.buttons, 1);
                 };
 
-                if (browser.isIE && browser.version > 11) {
+                if (browserUtils.isIE && browserUtils.version > 11) {
                     $el[0].onpointerdown = pointerHandler;
                     $el[0].onpointerup   = pointerHandler;
                 }
@@ -973,12 +937,12 @@ $(document).ready(function () {
             },
             function () {
                 ok(mousedownRaised && mousedownRaised && clickRaised, 'mouse events were raised');
-                if (browser.isMozilla || browser.isIE9)
-                    expect(11);
-                else if (browser.isIE)
-                    expect(17);
+                if (browserUtils.isFirefox || browserUtils.isIE9)
+                    expect(10);
+                else if (browserUtils.isIE)
+                    expect(16);
                 else
-                    expect(8);
+                    expect(7);
             },
             correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
         );
@@ -994,14 +958,13 @@ $(document).ready(function () {
             $spanInLabel = $('<span>label for input</span>').
                 addClass(TEST_ELEMENT_CLASS)
                 .appendTo($label),
-            $input       = $('<input />').
-                addClass(TEST_ELEMENT_CLASS)
+            $input       = $('<input />')
+                .attr('id', 'input')
+                .addClass(TEST_ELEMENT_CLASS)
                 .appendTo($label);
 
         runAsyncTest(
             function () {
-
-
                 actionsAPI.click($input[0]);
             },
             function () {
@@ -1011,9 +974,102 @@ $(document).ready(function () {
         );
     });
 
+    asyncTest('T303226 - Fixed content scrolls in IE11 while clicking on the invisible element', function () {
+        var htmlEl    = document.documentElement;
+        var oldScroll = styleUtils.getElementScroll($(htmlEl));
+        var clicked   = false;
+
+        htmlEl.style.overflow = 'hidden';
+        $el.css('marginTop', htmlEl.clientHeight + 50);
+
+        $el.click(function () {
+            clicked = true;
+        });
+
+        $el.mousedown(function (e) {
+            //NOTE: to prevent scrolling on focus event
+            e.preventDefault();
+        });
+
+        runAsyncTest(
+            function () {
+                actionsAPI.click($el);
+            },
+            function () {
+                ok(clicked);
+                deepEqual(styleUtils.getElementScroll($(htmlEl)), oldScroll);
+                htmlEl.style.overflow = '';
+            },
+            correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
+        );
+    });
+
+    asyncTest('T299665 - Incorrect click on image with associated map element in Mozilla', function () {
+        var $map  = $('<map name="map"></map>')
+            .appendTo('body')
+            .addClass(TEST_ELEMENT_CLASS);
+        var $area = $('<area shape="rect" coords="0,0,200,200" title="Area"/>').appendTo($map);
+
+        $('<img usemap="#map"/>')
+            .attr('src', window.QUnitGlobals.getResourceUrl("../../../data/runner/img.png"))
+            .css({
+                width:  '200px',
+                height: '200px'
+            })
+            .appendTo('body')
+            .addClass(TEST_ELEMENT_CLASS);
+
+        runAsyncTest(
+            function () {
+                $('#button1').remove();
+
+                $area.click(function (e) {
+                    if (this === e.target)
+                        $area.data('clicked', true);
+                });
+
+                actionsAPI.click($area);
+            },
+            function () {
+                ok($("area").data('clicked'));
+            },
+            correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
+        );
+    });
+
+    asyncTest('testcafe functions should not be in strict mode (GH-258)', function () {
+        var exceptionRaised = false;
+
+        runAsyncTest(
+            function () {
+                $el.click(function() {
+                    try {
+                        /*eslint-disable no-caller*/
+
+                        var caller = arguments.callee.caller;
+
+                        /*eslint-enable no-caller*/
+
+                        while (caller && caller.arguments && caller.arguments.callee)
+                            caller = caller.arguments.callee.caller;
+                    }
+                    catch (e) {
+                        exceptionRaised = true;
+                    }
+                });
+
+                actionsAPI.click($el);
+            },
+            function () {
+                ok(!exceptionRaised, 'should not throw an exception');
+            },
+            correctTestWaitingTime(TEST_COMPLETE_WAITING_TIMEOUT)
+        );
+    });
+
     module('touch devices test');
     //for touch devices
-    if (browser.hasTouchEvents) {
+    if (browserUtils.hasTouchEvents) {
         asyncTest('touch event on click', function () {
             var events = {
                 ontouchstart: false,

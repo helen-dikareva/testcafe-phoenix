@@ -1,10 +1,10 @@
 var hammerhead  = window.getTestCafeModule('hammerhead');
-var HH_SETTINGS = hammerhead.get('./settings').get();
+var hhsettings = hammerhead.get('./settings').get();
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var RunnerBase     = testCafeRunner.get('./runner-base');
 
-HH_SETTINGS.SERVICE_MSG_URL = '/ping/10';
+hhsettings.serviceMsgUrl = '/ping/10';
 
 asyncTest('run test', function () {
     var $iframe    = $('<iframe>');
@@ -48,7 +48,7 @@ asyncTest('run test', function () {
         storedIFrameStepExecuted.call(runner);
     };
 
-    runner._onError = function () {
+    runner._onFatalError = function () {
         errorRaised = true;
     };
 

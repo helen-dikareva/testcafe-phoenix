@@ -1,15 +1,14 @@
-import Promise from 'promise';
-import { getInstallations as getBrowserInstallations } from 'testcafe-browser-natives';
-import reporters from '../reporters';
+import Promise from 'pinkie';
+import { getBrowserInfo } from 'testcafe-browser-natives';
+import { Compiler } from 'testcafe-legacy-api';
+import { wrapDomAccessors } from 'testcafe-hammerhead';
 import BrowserConnection from '../browser-connection';
 import LocalBrowserConnection from '../browser-connection/local';
-import Compiler from '../compiler';
 import { MESSAGE, getText } from '../messages';
+import BrowserSet from './browser-set';
 
 
 export default class Bootstrapper {
-    static BROWSER_CONNECTION_READY_TIMEOUT = 30 * 1000;
-
     constructor (browserConnectionGateway) {
         this.browserConnectionGateway = browserConnectionGateway;
 
@@ -19,48 +18,17 @@ export default class Bootstrapper {
         this.reporter = null;
     }
 
-    static _createBrowserConnectionsReadyPromise (browserConnections) {
-        var ready = browserConnections
-            .filter(bc => !bc.ready)
-            .map(bc => new Promise(resolve => bc.once('ready', resolve)));
+    static async _convertAliasOrPathToBrowserInfo (browser) {
+        if (typeof browser === 'string') {
+            var browserInfo = await getBrowserInfo(browser);
 
-        return Promise.all(ready);
-    }
+            if (!browserInfo)
+                throw new Error(getText(MESSAGE.cantFindBrowser, browser));
 
-    static _waitBrowserConnectionsReady (browserConnections) {
-        return new Promise((resolve, reject) => {
-            var timeout = setTimeout(() => {
-                reject(new Error(getText(MESSAGE.cantEstablishBrowserConnection)));
-            }, Bootstrapper.BROWSER_CONNECTION_READY_TIMEOUT);
+            return browserInfo;
+        }
 
-            var onError = msg => {
-                clearTimeout(timeout);
-                reject(new Error(msg));
-            };
-
-            browserConnections.forEach(bc => bc.once('error', onError));
-
-            Bootstrapper
-                ._createBrowserConnectionsReadyPromise(browserConnections)
-                .then(()=> {
-                    browserConnections.forEach(bc => bc.removeListener('error', onError));
-                    clearTimeout(timeout);
-                    resolve();
-                });
-        });
-    }
-
-    static async _convertBrowserAliasToBrowserInfo (alias) {
-        if (typeof alias !== 'string')
-            return alias;
-
-        var installations = await getBrowserInstallations();
-        var browserInfo   = installations[alias.toLowerCase()];
-
-        if (!browserInfo)
-            throw new Error(getText(MESSAGE.cantFindBrowserForAlias, alias));
-
-        return browserInfo;
+        return browser;
     }
 
     _createConnectionFromBrowserInfo (browserInfo) {
@@ -74,59 +42,53 @@ export default class Bootstrapper {
         if (!this.browsers.length)
             throw new Error(getText(MESSAGE.browserNotSet));
 
-        var browsers           = await Promise.all(this.browsers.map(Bootstrapper._convertBrowserAliasToBrowserInfo));
+        var browsers           = await Promise.all(this.browsers.map(Bootstrapper._convertAliasOrPathToBrowserInfo));
         var browserConnections = browsers.map(browser => this._createConnectionFromBrowserInfo(browser));
 
-        try {
-            await Bootstrapper._waitBrowserConnectionsReady(browserConnections);
-        }
-        finally {
-            // NOTE: we should close local connections and related browsers once we've done
-            browserConnections.forEach(bc => {
-                if (bc instanceof LocalBrowserConnection)
-                    bc.close();
-            });
-        }
-
-        return browserConnections;
+        return await BrowserSet.from(browserConnections);
     }
 
     async _getTests () {
         if (!this.sources.length)
             throw new Error(getText(MESSAGE.testSourcesNotSet));
 
-        var compiler = new Compiler(this.sources);
+        var compiler = new Compiler(this.sources, wrapDomAccessors);
         var tests    = await compiler.getTests();
 
         if (this.filter)
             tests = tests.filter(test => this.filter(test.name, test.fixture.name, test.fixture.path));
 
+        if (!tests.length)
+            throw new Error(getText(MESSAGE.noTestsToRun));
+
         return tests;
     }
 
-    _getReporterCtor () {
-        var Reporter = this.reporter || 'spec';
+    _getReporterPlugin () {
+        var pluginFactory = this.reporter;
 
-        if (typeof Reporter === 'string') {
-            Reporter = reporters[Reporter.toLowerCase()];
+        if (typeof pluginFactory !== 'function') {
+            try {
+                var alias = this.reporter || 'spec';
 
-            if (!Reporter)
+                pluginFactory = require('testcafe-reporter-' + alias);
+            }
+            catch (err) {
                 throw new Error(getText(MESSAGE.cantFindReporterForAlias, this.reporter));
+            }
         }
 
-        return Reporter;
+        return pluginFactory();
     }
 
 
     // API
     async createRunnableConfiguration () {
-        var Reporter = this._getReporterCtor();
+        var reporterPlugin = this._getReporterPlugin();
 
-        var [browserConnections, tests] = await Promise.all([
-            this._getBrowserConnections(),
-            this._getTests()
-        ]);
+        var tests      = await this._getTests();
+        var browserSet = await this._getBrowserConnections();
 
-        return { Reporter, browserConnections, tests };
+        return { reporterPlugin, browserSet, tests };
     }
 }

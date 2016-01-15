@@ -1,7 +1,9 @@
+import path from 'path';
+import { readSync as read } from 'read-file-relative';
 import Mustache from 'mustache';
-import { Session } from 'hammerhead';
+import { Session } from 'testcafe-hammerhead';
 import COMMAND from './command';
-import read from '../../utils/read-file-relative';
+import ERROR_TYPE from '../../reporter/errors/type';
 
 
 // Const
@@ -10,8 +12,10 @@ const IFRAME_TEST_RUN_TEMPLATE = read('../../client/test-run/iframe.js.mustache'
 
 
 export default class TestRun extends Session {
-    constructor (test, browserConnection, opts) {
-        super();
+    constructor (test, browserConnection, screenshotCapturer, opts) {
+        var uploadsRoot = path.dirname(test.fixture.path);
+
+        super(uploadsRoot);
 
         this.running  = false;
         this.unstable = false;
@@ -24,25 +28,23 @@ export default class TestRun extends Session {
 
         // TODO remove it then we move shared data to session storage
         this.errs                       = [];
-        this.testError                  = null;
+        this.deferredError              = null;
         this.restartCount               = 0;
         this.nextStep                   = 0;
         this.actionTargetWaiting        = 0;
         this.nativeDialogsInfo          = null;
         this.nativeDialogsInfoTimeStamp = 0;
         this.stepsSharedData            = {};
+        this.screenshotCapturer         = screenshotCapturer;
 
         this.injectable.scripts.push('/testcafe-core.js');
-        this.injectable.scripts.push('/testcafe-ui-core.js');
-        this.injectable.styles.push('/uistyle.css');
-    }
-
-    async _loadUploads () {
-        //TODO fix it after UploadStorage rewrite
+        this.injectable.scripts.push('/testcafe-ui.js');
+        this.injectable.scripts.push('/testcafe-runner.js');
+        this.injectable.styles.push('/testcafe-ui-styles.css');
     }
 
     _getPayloadScript () {
-        var sharedJs  = this.test.fixture.getSharedJs();
+        var sharedJs = this.test.fixture.getSharedJs();
 
         // TODO
         var nextStep = this.actionTargetWaiting ? this.nextStep - 1 : this.nextStep;
@@ -55,43 +57,58 @@ export default class TestRun extends Session {
         }
 
         return Mustache.render(TEST_RUN_TEMPLATE, {
-            stepNames:             JSON.stringify(this.test.stepData.names),
-            testSteps:             this.test.stepData.js,
-            sharedJs:              sharedJs,
-            nextStep:              nextStep,
-            testError:             this.testError ? JSON.stringify(this.testError) : 'null',
-            browserIdleUrl:        this.browserConnection.idleUrl,
-            browserHeartbeatUrl:   this.browserConnection.heartbeatUrl,
-            takeScreenshotOnFails: this.opts.takeScreenshotOnFails,
-            failOnJsErrors:        this.opts.failOnJsErrors,
-            nativeDialogsInfo:     JSON.stringify(this.nativeDialogsInfo),
-            iFrameTestRunScript:   JSON.stringify(this._getIFramePayloadScript())
+            stepNames:              JSON.stringify(this.test.stepData.names),
+            testSteps:              this.test.stepData.js,
+            sharedJs:               sharedJs,
+            nextStep:               nextStep,
+            deferredError:          this.deferredError ? JSON.stringify(this.deferredError) : 'null',
+            browserHeartbeatUrl:    this.browserConnection.heartbeatUrl,
+            browserStatusUrl:       this.browserConnection.statusUrl,
+            takeScreenshots:        this.screenshotCapturer.enabled,
+            takeScreenshotsOnFails: this.opts.takeScreenshotsOnFails,
+            skipJsErrors:           this.opts.skipJsErrors,
+            nativeDialogsInfo:      JSON.stringify(this.nativeDialogsInfo),
+            iFrameTestRunScript:    JSON.stringify(this._getIframePayloadScript())
         });
     }
 
-    _getIFramePayloadScript () {
-        var sharedJs  = this.test.fixture.getSharedJs();
+    _getIframePayloadScript () {
+        var sharedJs = this.test.fixture.getSharedJs();
 
         return Mustache.render(IFRAME_TEST_RUN_TEMPLATE, {
-            sharedJs:              sharedJs,
-            browserIdleUrl:        this.browserConnection.idleUrl,
-            takeScreenshotOnFails: this.opts.takeScreenshotOnFails,
-            failOnJsErrors:        this.opts.failOnJsErrors,
-            nativeDialogsInfo:     JSON.stringify(this.nativeDialogsInfo)
+            sharedJs:               sharedJs,
+            takeScreenshotsOnFails: this.opts.takeScreenshotsOnFails,
+            skipJsErrors:           this.opts.skipJsErrors,
+            nativeDialogsInfo:      JSON.stringify(this.nativeDialogsInfo)
         });
     }
 
-    _addError (err) {
+    async _addError (err) {
         if (err.__sourceIndex !== void 0 && err.__sourceIndex !== null) {
             err.relatedSourceCode = this.test.sourceIndex[err.__sourceIndex];
             delete err.__sourceIndex;
         }
 
+        try {
+            err.screenshotPath = await this.screenshotCapturer.captureError(err);
+        }
+        catch (e) {
+            // NOTE: swallow the error silently if we can't take screenshots for some
+            // reason (e.g. we don't have permissions to write a screenshot file).
+        }
+
         this.errs.push(err);
     }
 
-    _fatalError (err) {
-        this._addError(err);
+    async _fatalError (err, deferred) {
+        // TODO: move this logic to the client when localStorageSandbox will be implemented in the
+        // testcafe-hammerhead repo https://github.com/DevExpress/testcafe-hammerhead/issues/252 !!!
+        if (deferred) {
+            this.deferredError = err;
+            return;
+        }
+
+        await this._addError(err);
         this.emit('done');
     }
 
@@ -103,8 +120,12 @@ export default class TestRun extends Session {
         this.isFileDownloading = true;
     }
 
-    handlePageError (ctx, err) {
-        this._fatalError(err);
+    handlePageError (ctx, errMsg) {
+        this._fatalError({
+            type:    ERROR_TYPE.pageNotLoaded,
+            message: errMsg
+        });
+
         ctx.redirect(this.browserConnection.idleUrl);
     }
 }
@@ -113,11 +134,11 @@ export default class TestRun extends Session {
 var ServiceMessages = TestRun.prototype;
 
 ServiceMessages[COMMAND.fatalError] = function (msg) {
-    this._fatalError(msg.err);
+    return this._fatalError(msg.err, msg.deferred);
 };
 
 ServiceMessages[COMMAND.assertionFailed] = function (msg) {
-    this._addError(msg.err);
+    return this._addError(msg.err);
 };
 
 ServiceMessages[COMMAND.done] = function () {
@@ -140,10 +161,6 @@ ServiceMessages[COMMAND.setActionTargetWaiting] = function (msg) {
     this.actionTargetWaiting = msg.value;
 };
 
-ServiceMessages[COMMAND.setTestError] = function (msg) {
-    this.testError = msg.err;
-};
-
 ServiceMessages[COMMAND.getAndUncheckFileDownloadingFlag] = function () {
     var isFileDownloading = this.isFileDownloading;
 
@@ -163,4 +180,16 @@ ServiceMessages[COMMAND.nativeDialogsInfoSet] = function (msg) {
         this.nativeDialogsInfoTimeStamp = msg.timeStamp;
         this.nativeDialogsInfo          = msg.info;
     }
+};
+
+ServiceMessages[COMMAND.takeScreenshot] = async function (msg) {
+    try {
+        return await this.screenshotCapturer.captureAction(msg);
+    }
+    catch (e) {
+        // NOTE: swallow the error silently if we can't take screenshots for some
+        // reason (e.g. we don't have permissions to write a screenshot file).
+        return null;
+    }
+
 };

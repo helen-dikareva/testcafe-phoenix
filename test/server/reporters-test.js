@@ -1,12 +1,13 @@
 var expect       = require('chai').expect;
 var EventEmitter = require('events').EventEmitter;
 var util         = require('util');
-var Promise      = require('promise');
-var reporters    = require('../../lib/reporters');
-var readFile     = require('../../lib/utils/read-file-relative');
+var Promise      = require('pinkie');
+var Reporter     = require('../../lib/reporter');
 
 describe('Reporters', function () {
     // Runnable configuration mocks
+    var screenshotDir = '/screenshots/1445437598847';
+
     var browserConnectionMocks = [
         { userAgent: 'Chrome' },
         { userAgent: 'Firefox' }
@@ -29,12 +30,14 @@ describe('Reporters', function () {
 
     var testMocks = [
         {
-            name:    'fixture1test1',
-            fixture: fixtureMocks[0]
+            name:               'fixture1test1',
+            fixture:            fixtureMocks[0],
+            screenshotExpected: true
         },
         {
-            name:    'fixture1test2',
-            fixture: fixtureMocks[0]
+            name:               'fixture1test2',
+            fixture:            fixtureMocks[0],
+            screenshotExpected: true
         },
         {
             name:    'fixture1test3',
@@ -72,11 +75,8 @@ describe('Reporters', function () {
             browserConnection: browserConnectionMocks[0],
 
             errs: [
-                'Error1: Lorem ipsum dolor sit amet, consectetur adipiscing elit',
-
-                'Error2: Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut ' +
-                'aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate ' +
-                'velit esse cillum dolore eu fugiat nulla pariatur.'
+                { text: 'err1' },
+                { text: 'err2' }
             ]
         },
 
@@ -129,11 +129,9 @@ describe('Reporters', function () {
             test:              testMocks[1],
             unstable:          false,
             browserConnection: browserConnectionMocks[1],
-
-            errs: [
-                'Error3: Excepteur sint occaecat cupidatat non proident, ' +
-                'sunt in culpa qui officia deserunt mollit anim id est laborum &.'
-            ]
+            errs:              [{
+                text: 'err1'
+            }]
         },
 
         //fixture1test3
@@ -165,13 +163,21 @@ describe('Reporters', function () {
             test:              testMocks[5],
             unstable:          true,
             browserConnection: browserConnectionMocks[1],
-
-            errs: [
-                'Error1: Lorem ipsum dolor sit amet, consectetur adipiscing elit, ' +
-                'sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-            ]
+            errs:              [{
+                text: 'err1'
+            }]
         }
     ];
+
+    var ScreenshotsMock = function () {
+        this.hasCapturedFor = function (testMock) {
+            return testMock.screenshotExpected;
+        };
+
+        this.getPathFor = function () {
+            return screenshotDir;
+        };
+    };
 
 
     // Task mock
@@ -180,35 +186,10 @@ describe('Reporters', function () {
 
         this.tests              = testMocks;
         this.browserConnections = browserConnectionMocks;
+        this.screenshots        = new ScreenshotsMock();
     };
 
     util.inherits(TaskMock, EventEmitter);
-
-
-    // Output stream and formatter mocks
-    function createOutStreamMock () {
-        return {
-            data:      '',
-            endCalled: false,
-
-            write: function (text) {
-                if (this.endCalled)
-                    throw new Error('Can not write() after end()');
-
-                this.data += text;
-            },
-
-            end: function (text) {
-                this.write(text);
-                this.endCalled = true;
-            }
-        };
-    }
-
-    function formatterMock (err, userAgent) {
-        return userAgent + ' - ' + err;
-    }
-
 
     // Browser job emulation
     function delay () {
@@ -235,49 +216,173 @@ describe('Reporters', function () {
         }, delay());
     }
 
+    it('Should analyze task progress and call appropriate plugin methods', function () {
+        var taskMock = new TaskMock();
 
-    // Sanitize string for comparison
-    function sanitize (report) {
-        return report
-            .replace(/\r\n/g, '\n')
-            .trim();
-    }
+        var expectedCalls = [
+            {
+                method: 'reportTaskStart',
+                args:   [
+                    new Date('1970-01-01T00:00:00.000Z'),
+                    [
+                        'Chrome',
+                        'Firefox'
+                    ],
+                    6
+                ]
+            },
+            {
+                method: 'reportFixtureStart',
+                args:   [
+                    'fixture1',
+                    './fixture1.js'
+                ]
+            },
+            {
+                method: 'reportTestDone',
+                args:   [
+                    'fixture1test1',
+                    [],
+                    74000,
+                    true,
+                    '/screenshots/1445437598847'
+                ]
+            },
+            {
+                method: 'reportTestDone',
+                args:   [
+                    'fixture1test2',
+                    [
+                        {
+                            text:      'err1',
+                            userAgent: 'Chrome'
+                        },
+                        {
+                            text:      'err2',
+                            userAgent: 'Chrome'
+                        },
+                        {
+                            text:      'err1',
+                            userAgent: 'Firefox'
+                        }
+                    ],
+                    74000,
+                    false,
+                    '/screenshots/1445437598847'
+                ]
+            },
+            {
+                method: 'reportTestDone',
+                args:   [
+                    'fixture1test3',
+                    [],
+                    74000,
+                    false,
+                    null
+                ]
+            },
+            {
+                method: 'reportFixtureStart',
+                args:   [
+                    'fixture2',
+                    './fixture2.js'
+                ]
+            },
+            {
+                method: 'reportTestDone',
+                args:   [
+                    'fixture2test1',
+                    [],
+                    74000,
+                    false,
+                    null
+                ]
+            },
+            {
+                method: 'reportTestDone',
+                args:   [
+                    'fixture2test2',
+                    [],
+                    74000,
+                    false,
+                    null
+                ]
+            },
+            {
+                method: 'reportFixtureStart',
+                args:   [
+                    'fixture3',
+                    './fixture3.js'
+                ]
+            },
+            {
+                method: 'reportTestDone',
+                args:   [
+                    'fixture3test1',
+                    [
+                        {
+                            text:      'err1',
+                            userAgent: 'Firefox'
+                        }
+                    ],
+                    74000,
+                    true,
+                    null
+                ]
+            },
+            {
+                method: 'reportTaskDone',
+                args:   [
+                    new Date('1970-01-01T00:15:25.000Z'),
+                    4
+                ]
+            }
+        ];
 
+        var reporter = new Reporter({
+            calls: [],
 
-    // Test routine
-    function testReporter (reporterAlias, done) {
-        var taskMock       = new TaskMock();
-        var outStreamMock  = createOutStreamMock();
-        var Reporter       = reporters[reporterAlias];
-        var reporter       = new Reporter(taskMock, outStreamMock, formatterMock);
-        var expectedReport = readFile('./data/expected-reports/' + reporterAlias);
+            reportTaskStart: function () {
+                var args = Array.prototype.slice.call(arguments);
 
-        // NOTE: replace dates in reporting routines with the fixed values for the testing purposes
-        var origReportTaskStart = reporter._reportTaskStart;
-        var origReportTestDone  = reporter._reportTestDone;
-        var origReportTaskDone  = reporter._reportTaskDone;
+                expect(args[0]).to.be.a('date');
 
-        reporter._reportTaskStart = function (startTime, userAgents) {
-            expect(startTime).to.be.a('date');
-            origReportTaskStart.call(this, new Date('Thu Jan 01 1970 00:00:00 UTC'), userAgents);
-        };
+                // NOTE: replace startTime
+                args[0] = new Date('Thu Jan 01 1970 00:00:00 UTC');
 
-        reporter._reportTestDone = function (name, errMsgs, durationMs, unstable) {
-            expect(durationMs).to.be.a('number');
-            origReportTestDone.call(this, name, errMsgs, 74000, unstable);
-        };
+                this.calls.push({ method: 'reportTaskStart', args: args });
+            },
 
-        reporter._reportTaskDone = function (passed, total, endTime) {
-            expect(endTime).to.be.a('date');
-            origReportTaskDone.call(this, passed, total, new Date('Thu Jan 01 1970 00:15:25 UTC'));
-        };
+            reportFixtureStart: function () {
+                this.calls.push({ method: 'reportFixtureStart', args: Array.prototype.slice.call(arguments) });
+            },
 
-        // NOTE: force reporter symbols
-        reporter.symbols = { ok: '✓', err: '✖' };
+            reportTestDone: function () {
+                var args = Array.prototype.slice.call(arguments);
+
+                expect(args[2]).to.be.a('number');
+
+                // NOTE: replace durationMs
+                args[2] = 74000;
+
+                this.calls.push({ method: 'reportTestDone', args: args });
+            },
+
+            reportTaskDone: function () {
+                var args = Array.prototype.slice.call(arguments);
+
+                expect(args[0]).to.be.a('date');
+
+                // NOTE: replace endTime
+                args[0] = new Date('Thu Jan 01 1970 00:15:25 UTC');
+
+                this.calls.push({ method: 'reportTaskDone', args: args });
+            }
+        }, taskMock);
 
         taskMock.emit('start');
 
-        Promise
+        return Promise
             .all([
                 emulateBrowserJob(taskMock, chromeTestRunMocks),
                 emulateBrowserJob(taskMock, firefoxTestRunMocks)
@@ -285,33 +390,14 @@ describe('Reporters', function () {
             .then(function () {
                 taskMock.emit('done');
 
-                expect(sanitize(outStreamMock.data)).eql(sanitize(expectedReport));
-                expect(outStreamMock.endCalled).to.be.true;
-
-                done();
-            })
-            .catch(done);
-    }
-
-
-    // Tests
-    it('spec', function (done) {
-        testReporter('spec', done);
+                expect(reporter.plugin.calls).eql(expectedCalls);
+            });
     });
 
-    it('list', function (done) {
-        testReporter('list', done);
-    });
+    it('Should disable colors if plugin has "noColors" flag', function () {
+        var taskMock = new TaskMock();
+        var reporter = new Reporter({ noColors: true }, taskMock);
 
-    it('minimal', function (done) {
-        testReporter('minimal', done);
-    });
-
-    it('json', function (done) {
-        testReporter('json', done);
-    });
-
-    it('xunit', function (done) {
-        testReporter('xunit', done);
+        expect(reporter.plugin.chalk.enabled).to.be.false;
     });
 });

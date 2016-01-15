@@ -1,14 +1,14 @@
 import { EventEmitter } from 'events';
 import Mustache from 'mustache';
 import { parse as parseUserAgent } from 'useragent';
-import read from '../utils/read-file-relative';
+import { readSync as read } from 'read-file-relative';
 import COMMAND from './command';
 import { MESSAGE, getText } from '../messages';
-import { remove } from '../utils/array';
+import remove from '../utils/array-remove';
 
 
 // Const
-const IDLE_PAGE_TEMPLATE = read('../client/browser-idle-page/index.html.mustache');
+const IDLE_PAGE_TEMPLATE = read('../client/browser/idle-page/index.html.mustache');
 
 
 // Global instance counter used to generate ID's
@@ -16,17 +16,20 @@ var instanceCount = 0;
 
 
 export default class BrowserConnection extends EventEmitter {
-    static HEARTBEAT_TIMEOUT = 2 * 60 * 1000;
-
     constructor (gateway) {
         super();
+
+        this.HEARTBEAT_TIMEOUT = 2 * 60 * 1000;
 
         this.id                       = ++instanceCount;
         this.jobQueue                 = [];
         this.browserConnectionGateway = gateway;
         this.userAgent                = null;
 
+        this.closed           = false;
         this.ready            = false;
+        this.idle             = true;
+        this.switchingToIdle  = false;
         this.heartbeatTimeout = null;
 
         this.url          = `${gateway.domain}/browser/connect/${this.id}`;
@@ -34,14 +37,15 @@ export default class BrowserConnection extends EventEmitter {
         this.idleUrl      = `${gateway.domain}/browser/idle/${this.id}`;
         this.statusUrl    = `${gateway.domain}/browser/status/${this.id}`;
 
+        this.on('error', () => this.close());
+
         this.browserConnectionGateway.startServingConnection(this);
     }
 
     _waitForHeartbeat () {
         this.heartbeatTimeout = setTimeout(() => {
-            this.close();
-            this.emit('error', getText(MESSAGE.browserDisconnected, this.userAgent.toString()));
-        }, BrowserConnection.HEARTBEAT_TIMEOUT);
+            this.emit('error', new Error(getText(MESSAGE.browserDisconnected, this.userAgent)));
+        }, this.HEARTBEAT_TIMEOUT);
     }
 
     _popNextTestRunUrl () {
@@ -68,14 +72,18 @@ export default class BrowserConnection extends EventEmitter {
     }
 
     close () {
-        this.ready = false;
         this.browserConnectionGateway.stopServingConnection(this);
         clearTimeout(this.heartbeatTimeout);
+
+        this.ready  = false;
+        this.closed = true;
+
+        this.emit('closed');
     }
 
     establish (userAgent) {
         this.ready     = true;
-        this.userAgent = parseUserAgent(userAgent);
+        this.userAgent = parseUserAgent(userAgent).toString();
 
         this._waitForHeartbeat();
         this.emit('ready');
@@ -88,18 +96,27 @@ export default class BrowserConnection extends EventEmitter {
 
     renderIdlePage () {
         return Mustache.render(IDLE_PAGE_TEMPLATE, {
-            id:        this.id,
-            userAgent: this.userAgent.toString(),
-            statusUrl: this.statusUrl
+            userAgent:    this.userAgent,
+            statusUrl:    this.statusUrl,
+            heartbeatUrl: this.heartbeatUrl
         });
     }
 
     getStatus () {
+        if (this.switchingToIdle) {
+            this.switchingToIdle = false;
+            this.idle = true;
+            this.emit('idle');
+        }
+
         var testRunUrl = this._popNextTestRunUrl();
 
-        if (testRunUrl)
+        if (testRunUrl) {
+            this.idle = false;
             return { cmd: COMMAND.run, url: testRunUrl };
+        }
 
-        return { cmd: COMMAND.idle };
+        this.switchingToIdle = true;
+        return { cmd: COMMAND.idle, url: this.idleUrl };
     }
 }

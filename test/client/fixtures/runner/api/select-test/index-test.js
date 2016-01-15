@@ -1,12 +1,12 @@
-var hammerhead = window.getTestCafeModule('hammerhead');
-var browser    = hammerhead.Util.Browser;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore  = window.getTestCafeModule('testCafeCore');
 var SETTINGS      = testCafeCore.get('./settings').get();
-var ERRORS        = testCafeCore.get('./errors');
-var DOM           = testCafeCore.get('./util/dom');
-var style         = testCafeCore.get('./util/style');
-var textSelection = testCafeCore.get('./util/text-selection');
+var ERROR_TYPE    = testCafeCore.ERROR_TYPE;
+var domUtils      = testCafeCore.get('./utils/dom');
+var style         = testCafeCore.get('./utils/style');
+var textSelection = testCafeCore.get('./utils/text-selection');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -24,7 +24,7 @@ var stepIterator = new StepIterator();
 actionsAPI.init(stepIterator);
 
 var correctTestWaitingTime = function (time) {
-    if (browser.isTouchDevice && browser.isMozilla)
+    if (browserUtils.isTouchDevice && browserUtils.isFirefox)
         return time * 2;
 
     return time;
@@ -59,16 +59,16 @@ $(document).ready(function () {
 
     stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
         stepIterator.state.stoppedOnFail = false;
-        currentErrorCode                 = err.code;
+        currentErrorType                 = err.type;
         currentSourceIndex               = err.__sourceIndex;
 
         if (err.element)
             currentErrorElement = err.element;
     });
 
-    var checkScrollAfterSelect = !(browser.isMozilla || browser.isIE),
+    var checkScrollAfterSelect = !(browserUtils.isFirefox || browserUtils.isIE),
 
-        currentErrorCode       = null,
+        currentErrorType       = null,
         currentSourceIndex     = null,
         currentErrorElement    = null,
         //constants
@@ -98,7 +98,7 @@ $(document).ready(function () {
         },
 
         checkSelection         = function (el, start, end, inverse) {
-            equal(DOM.getActiveElement(), el, 'selected element is active');
+            equal(domUtils.getActiveElement(), el, 'selected element is active');
             equal(textSelection.getSelectionStart(el), start, 'start selection correct');
             equal(textSelection.getSelectionEnd(el), end, 'end selection correct');
             equal(textSelection.hasInverseSelection(el), inverse, 'selection direction correct');
@@ -123,7 +123,7 @@ $(document).ready(function () {
         },
 
         startNext              = function () {
-            if (browser.isIE) {
+            if (browserUtils.isIE) {
                 removeTestElements();
                 window.setTimeout(start, 30);
             }
@@ -139,7 +139,7 @@ $(document).ready(function () {
     $('body').css('height', '1500px');
     //NOTE: problem with window.top bodyMargin in IE9 if test 'runAll'
     //because we can't determine that element is in qunit test iframe
-    if (browser.isIE9)
+    if (browserUtils.isIE9)
         $(window.top.document).find('body').css('marginTop', '0px');
 
     //tests
@@ -152,7 +152,7 @@ $(document).ready(function () {
     });
 
     QUnit.testDone(function () {
-        if (!browser.isIE)
+        if (!browserUtils.isIE)
             removeTestElements();
         $(BIG_TEXTAREA_SELECTOR)[0].selectionStart = 0;
         $(BIG_TEXTAREA_SELECTOR)[0].selectionEnd   = 0;
@@ -160,7 +160,7 @@ $(document).ready(function () {
         $(INPUT_SELECTOR)[0].selectionStart        = 0;
         $(INPUT_SELECTOR)[0].selectionEnd          = 0;
         $(INPUT_SELECTOR)[0].scrollLeft            = 0;
-        currentErrorCode                           = null;
+        currentErrorType                           = null;
         currentErrorElement                        = null;
         currentSourceIndex                         = null;
         SETTINGS.ENABLE_SOURCE_INDEX               = false;
@@ -174,10 +174,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input);
@@ -199,10 +199,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, 5);
@@ -223,10 +223,10 @@ $(document).ready(function () {
             mouseup     = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, -5);
@@ -246,10 +246,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, 0);
@@ -269,10 +269,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, 2, 4);
@@ -292,10 +292,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, 4, 2);
@@ -315,10 +315,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, 2, 15, 7, 15);
@@ -339,7 +339,7 @@ $(document).ready(function () {
         };
         actionsAPI.select($input, 'abc', '#34');
         window.setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_INCORRECT_SELECT_ACTION_ARGUMENTS, 'correct error code sent');
+            equal(currentErrorType, ERROR_TYPE.incorrectSelectActionArguments, 'correct error type sent');
             equal(currentSourceIndex, 34);
             start();
         }, correctTestWaitingTime(500));
@@ -352,7 +352,7 @@ $(document).ready(function () {
         };
         actionsAPI.select($input, 2, -4, '#12');
         window.setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_INCORRECT_SELECT_ACTION_ARGUMENTS, 'correct error code sent');
+            equal(currentErrorType, ERROR_TYPE.incorrectSelectActionArguments, 'correct error type sent');
             equal(currentSourceIndex, 12);
             start();
         }, correctTestWaitingTime(500));
@@ -366,10 +366,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea);
@@ -389,10 +389,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 5);
@@ -413,10 +413,10 @@ $(document).ready(function () {
             mouseup     = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, -5);
@@ -436,10 +436,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 3, 20);
@@ -459,10 +459,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 20, 3);
@@ -484,10 +484,10 @@ $(document).ready(function () {
             mouseup       = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 0, 3, 2, 7);
@@ -495,8 +495,8 @@ $(document).ready(function () {
             function () {
                 ok(mousedown, 'select started from textarea');
                 ok(mouseup, 'select ended on textarea');
-                startPosition = DOM.getTextareaPositionByLineAndOffset($textarea[0], 0, 3);
-                endPosition   = DOM.getTextareaPositionByLineAndOffset($textarea[0], 2, 7);
+                startPosition = domUtils.getTextareaPositionByLineAndOffset($textarea[0], 0, 3);
+                endPosition   = domUtils.getTextareaPositionByLineAndOffset($textarea[0], 2, 7);
                 checkSelection($textarea[0], startPosition, endPosition, false);
             },
             correctTestWaitingTime(2000)
@@ -511,10 +511,10 @@ $(document).ready(function () {
             mouseup       = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 2, 7, 0, 3);
@@ -522,8 +522,8 @@ $(document).ready(function () {
             function () {
                 ok(mousedown, 'select started from textarea');
                 ok(mouseup, 'select ended on textarea');
-                startPosition = DOM.getTextareaPositionByLineAndOffset($textarea[0], 0, 3);
-                endPosition   = DOM.getTextareaPositionByLineAndOffset($textarea[0], 2, 7);
+                startPosition = domUtils.getTextareaPositionByLineAndOffset($textarea[0], 0, 3);
+                endPosition   = domUtils.getTextareaPositionByLineAndOffset($textarea[0], 2, 7);
                 checkSelection($textarea[0], startPosition, endPosition, true);
             },
             correctTestWaitingTime(2000)
@@ -537,10 +537,10 @@ $(document).ready(function () {
             mouseup        = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 2, 7, 2, 7);
@@ -548,7 +548,7 @@ $(document).ready(function () {
             function () {
                 ok(mousedown, 'select started from textarea');
                 ok(mouseup, 'select ended on textarea');
-                selectPosition = DOM.getTextareaPositionByLineAndOffset($textarea[0], 2, 7);
+                selectPosition = domUtils.getTextareaPositionByLineAndOffset($textarea[0], 2, 7);
                 checkSelection($textarea[0], selectPosition, selectPosition, false);
             },
             correctTestWaitingTime(2000)
@@ -563,10 +563,10 @@ $(document).ready(function () {
             mouseup       = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 1, 8, 2);
@@ -574,7 +574,7 @@ $(document).ready(function () {
             function () {
                 ok(mousedown, 'select started from textarea');
                 ok(mouseup, 'select ended on textarea');
-                startPosition = DOM.getTextareaPositionByLineAndOffset($textarea[0], 1, Math.min(8, textareaValue.split('\n')[1].length));
+                startPosition = domUtils.getTextareaPositionByLineAndOffset($textarea[0], 1, Math.min(8, textareaValue.split('\n')[1].length));
                 checkSelection($textarea[0], startPosition, textareaValue.length, false);
             },
             correctTestWaitingTime(2000)
@@ -588,7 +588,7 @@ $(document).ready(function () {
         };
         actionsAPI.select($textarea, 2, 4, -2, 5, '#56');
         window.setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_INCORRECT_SELECT_ACTION_ARGUMENTS, 'correct error code sent');
+            equal(currentErrorType, ERROR_TYPE.incorrectSelectActionArguments, 'correct error type sent');
             equal(currentSourceIndex, 56);
             start();
         }, correctTestWaitingTime(500));
@@ -602,11 +602,11 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0].value                                                    = '';
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0].value                                                         = '';
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input);
@@ -626,10 +626,10 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea);
@@ -649,11 +649,11 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0].value                                                    = '1   2     3    4    5      6';
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0].value                                                         = '1   2     3    4    5      6';
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     mouseup = true;
                 };
                 actionsAPI.select($input, 3, 25);
@@ -674,10 +674,10 @@ $(document).ready(function () {
             mouseup     = false;
         runAsyncTest(
             function () {
-                $textarea.bind(browser.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchstart' : 'mousedown', function () {
                     mousedown = true;
                 });
-                $textarea.bind(browser.hasTouchEvents ? 'touchend' : 'mouseup', function () {
+                $textarea.bind(browserUtils.hasTouchEvents ? 'touchend' : 'mouseup', function () {
                     mouseup = true;
                 });
                 actionsAPI.select($textarea, 3, valueLength - 3);
@@ -699,15 +699,15 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0].value                                                    = '1234567891012131415161718911200111554454455454545412121212121212';
-                $input[0].selectionStart                                           = 0;
-                $input[0].selectionEnd                                             = 0;
-                $input[0].scrollLeft                                               = 0;
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0].value                                                         = '1234567891012131415161718911200111554454455454545412121212121212';
+                $input[0].selectionStart                                                = 0;
+                $input[0].selectionEnd                                                  = 0;
+                $input[0].scrollLeft                                                    = 0;
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     equal(style.getElementScroll($input[0]).left, 0);
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($input[0]).left > 0);
                     mouseup = true;
@@ -734,17 +734,17 @@ $(document).ready(function () {
             mouseup   = false;
         runAsyncTest(
             function () {
-                $input[0].value                                                    = '1234567891012131415161718911200111554454455454545412121212121212';
-                $input[0].selectionStart                                           = 0;
-                $input[0].selectionEnd                                             = 0;
-                $input[0].scrollLeft                                               = 0;
-                $input[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $input[0].value                                                         = '1234567891012131415161718911200111554454455454545412121212121212';
+                $input[0].selectionStart                                                = 0;
+                $input[0].selectionEnd                                                  = 0;
+                $input[0].scrollLeft                                                    = 0;
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     oldScroll = style.getElementScroll($input[0]).left;
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($input[0]).left > 0);
                     mousedown = true;
                 };
-                $input[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $input[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($input[0]).left < oldScroll);
                     mouseup = true;
@@ -775,11 +775,11 @@ $(document).ready(function () {
         runAsyncTest(
             function () {
                 $textarea.css('height', '100px');
-                $textarea[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     equal(style.getElementScroll($textarea[0]).top, 0);
                     mousedown = true;
                 };
-                $textarea[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($textarea[0]).top > 0);
                     mouseup = true;
@@ -809,11 +809,11 @@ $(document).ready(function () {
         runAsyncTest(
             function () {
                 $textarea.css('height', '100px');
-                $textarea[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     equal(style.getElementScroll($textarea[0]).top, 0);
                     mousedown = true;
                 };
-                $textarea[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($textarea[0]).top > 0);
                     mouseup = true;
@@ -842,12 +842,12 @@ $(document).ready(function () {
         runAsyncTest(
             function () {
                 $textarea.css('height', '100px');
-                $textarea[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     oldScroll = style.getElementScroll($textarea[0]).top;
                     ok(style.getElementScroll($textarea[0]).top > 0);
                     mousedown = true;
                 };
-                $textarea[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($textarea[0]).top < oldScroll);
                     mouseup = true;
@@ -876,12 +876,12 @@ $(document).ready(function () {
         runAsyncTest(
             function () {
                 $textarea.css('height', '100px');
-                $textarea[0][browser.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchstart' : 'onmousedown'] = function () {
                     oldScroll = style.getElementScroll($textarea[0]).top;
                     ok(style.getElementScroll($textarea[0]).top > 0);
                     mousedown = true;
                 };
-                $textarea[0][browser.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
+                $textarea[0][browserUtils.hasTouchEvents ? 'ontouchend' : 'onmouseup']     = function () {
                     if (checkScrollAfterSelect)
                         ok(style.getElementScroll($textarea[0]).top < oldScroll);
                     mouseup = true;

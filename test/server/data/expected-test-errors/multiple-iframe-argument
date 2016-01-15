@@ -1,2 +1,5 @@
-Error on step "Step": code
-The selector within the inIFrame function returns more than one iframe element.
+Chrome 15.0.874 / Mac OS X 10.8.1
+CATEGORY=inIFrameSelectorError
+Error at step "Step":
+The selector within the inIFrame function returns more than one iframe
+element.

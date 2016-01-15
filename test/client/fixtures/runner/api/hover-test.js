@@ -1,10 +1,9 @@
-var hammerhead  = window.getTestCafeModule('hammerhead');
-var browser     = hammerhead.Util.Browser;
-var jsProcessor = hammerhead.JSProcessor;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
 var SETTINGS     = testCafeCore.get('./settings').get();
-var position     = testCafeCore.get('./util/position');
+var position     = testCafeCore.get('./utils/position');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -50,13 +49,13 @@ $(document).ready(function () {
 
     stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
         stepIterator.state.stoppedOnFail = false;
-        currentErrorCode                 = err.code;
+        currentErrorType                 = err.type;
         currentSourceIndex               = err.__sourceIndex;
     });
 
     var $el,
         currentSourceIndex = null,
-        currentErrorCode   = null,
+        currentErrorType   = null,
         //constants
         TEST_ELEMENT_CLASS = 'testElement',
 
@@ -86,13 +85,13 @@ $(document).ready(function () {
 
     QUnit.testDone(function () {
         $('.' + TEST_ELEMENT_CLASS).remove();
-        currentErrorCode             = null;
+        currentErrorType             = null;
         currentSourceIndex           = null;
         SETTINGS.ENABLE_SOURCE_INDEX = false;
     });
 
     asyncTest('check mouseover and mouseout event', function () {
-        if (browser.hasTouchEvents) {
+        if (browserUtils.hasTouchEvents) {
             expect(0);
             start();
             return;
@@ -136,7 +135,7 @@ $(document).ready(function () {
 
 
     asyncTest('T188166 - act.hover trigger "mouseenter" event with "which" parameter 1', function () {
-        if (browser.hasTouchEvents) {
+        if (browserUtils.hasTouchEvents) {
             expect(0);
             start();
             return;
@@ -145,17 +144,17 @@ $(document).ready(function () {
         var $el = addInputElement('button', 'button1', 200, 200);
 
         $el.mouseover(function (e) {
-            equal(eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.which')), browser.isWebKit ? 0 : 1);
-            equal(eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.originalEvent.which')), browser.isWebKit ? 0 : 1);
+            equal(window.getProperty(e, 'which'), browserUtils.isWebKit ? 0 : 1);
+            equal(window.getProperty(e.originalEvent, 'which'), browserUtils.isWebKit ? 0 : 1);
         });
 
         $el.mouseenter(function (e) {
-            equal(eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.which')), browser.isWebKit ? 0 : 1);
-            equal(eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.originalEvent.which')), browser.isWebKit ? 0 : 1);
+            equal(window.getProperty(e, 'which'), browserUtils.isWebKit ? 0 : 1);
+            equal(window.getProperty(e.originalEvent, 'which'), browserUtils.isWebKit ? 0 : 1);
         });
 
         $el[0].addEventListener('mouseover', function (e) {
-            equal(eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.which')), browser.isWebKit ? 0 : 1);
+            equal(window.getProperty(e, 'which'), browserUtils.isWebKit ? 0 : 1);
         });
 
         asyncActionCallback = function () {
@@ -167,7 +166,7 @@ $(document).ready(function () {
     });
 
     asyncTest('T191183 - pointer event properties are fixed', function () {
-        if (browser.hasTouchEvents) {
+        if (browserUtils.hasTouchEvents) {
             expect(0);
             start();
             return;
@@ -180,28 +179,30 @@ $(document).ready(function () {
             mouseenterWhichParam = null;
 
         $el.mouseover(function (e) {
-            mouseoverRaised = true;
+            mouseoverRaised     = true;
+            mouseoverWhichParam = window.getProperty(e, 'which');
+
             equal(e.button, 0);
-            if (browser.isIE || browser.isMozilla)
+            if (browserUtils.isIE || browserUtils.isFirefox)
                 equal(e.buttons, 0);
-            mouseoverWhichParam = eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.which'));
         });
 
         $el.mouseenter(function (e) {
-            mouseenterRaised = true;
+            mouseenterRaised     = true;
+            mouseenterWhichParam = window.getProperty(e, 'which');
+
             equal(e.button, 0);
-            if (browser.isIE || browser.isMozilla)
+            if (browserUtils.isIE || browserUtils.isFirefox)
                 equal(e.buttons, 0);
-            mouseenterWhichParam = eval(window[jsProcessor.PROCESS_SCRIPT_METH_NAME]('e.which'));
         });
 
         var pointerHandler = function (e) {
-            equal(e.pointerType, browser.version > 10 ? 'mouse' : 4);
+            equal(e.pointerType, browserUtils.version > 10 ? 'mouse' : 4);
             equal(e.button, -1);
             equal(e.buttons, 0);
         };
 
-        if (browser.isIE && browser.version > 11) {
+        if (browserUtils.isIE && browserUtils.version > 11) {
             $el[0].onpointermove = pointerHandler;
             $el[0].onpointerover = pointerHandler;
         }
@@ -213,12 +214,12 @@ $(document).ready(function () {
         asyncActionCallback = function () {
             ok(mouseoverRaised);
             ok(mouseenterRaised);
-            equal(mouseoverWhichParam, browser.isWebKit ? 0 : 1);
-            equal(mouseenterWhichParam, browser.isWebKit ? 0 : 1);
+            equal(mouseoverWhichParam, browserUtils.isWebKit ? 0 : 1);
+            equal(mouseenterWhichParam, browserUtils.isWebKit ? 0 : 1);
 
-            if (browser.isMozilla || browser.isIE9)
+            if (browserUtils.isFirefox || browserUtils.isIE9)
                 expect(8);
-            else if (browser.isIE)
+            else if (browserUtils.isIE)
                 expect(17);
             else
                 expect(6);
@@ -229,7 +230,7 @@ $(document).ready(function () {
     });
 
     asyncTest('T214458 - The Hover action does not allow specifying mouse action options thus being inconsistent with other actions', function () {
-        if (browser.hasTouchEvents) {
+        if (browserUtils.hasTouchEvents) {
             expect(0);
             start();
             return;

@@ -1,9 +1,8 @@
-var hammerhead  = window.getTestCafeModule('hammerhead');
-var browser     = hammerhead.Util.Browser;
-var jsProcessor = hammerhead.JSProcessor;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
-var DOM          = testCafeCore.get('./util/dom');
+var domUtils     = testCafeCore.get('./utils/dom');
 
 var testCafeRunner         = window.getTestCafeModule('testCafeRunner');
 var automation             = testCafeRunner.get('./automation/automation');
@@ -26,7 +25,7 @@ $(document).ready(function () {
     $('body').css('height', 1500).attr('contenteditable', 'true');
 
     var startNext = function () {
-        if (browser.isIE) {
+        if (browserUtils.isIE) {
             removeTestElements();
             window.setTimeout(start, 30);
         }
@@ -39,17 +38,17 @@ $(document).ready(function () {
     };
 
     var checkSelection = function ($el, startNode, startOffset, endNode, endOffset) {
-        var curDocument = DOM.findDocument($el[0]),
+        var curDocument = domUtils.findDocument($el[0]),
             selection   = curDocument.getSelection();
-        equal(DOM.getActiveElement(), $el[0]);
-        ok(DOM.isTheSameNode(startNode, selection.anchorNode), 'startNode correct');
+        equal(domUtils.getActiveElement(), $el[0]);
+        ok(domUtils.isTheSameNode(startNode, selection.anchorNode), 'startNode correct');
         equal(selection.anchorOffset, startOffset, 'startOffset correct');
-        ok(DOM.isTheSameNode(endNode, selection.focusNode), 'endNode correct');
+        ok(domUtils.isTheSameNode(endNode, selection.focusNode), 'endNode correct');
         equal(selection.focusOffset, endOffset, 'endOffset correct');
     };
 
     var setInnerHTML = function ($el, innerHTML) {
-        window[jsProcessor.SET_PROPERTY_METH_NAME]($el[0], 'innerHTML', innerHTML);
+        window.setProperty($el[0], 'innerHTML', innerHTML);
     };
 
     var stateHelper = {
@@ -62,8 +61,8 @@ $(document).ready(function () {
             thirdElementInnerHTML  = $('#3')[0].innerHTML;
         },
         restoreState: function () {
-            var curActiveElement = DOM.getActiveElement(),
-                curDocument      = DOM.findDocument(curActiveElement);
+            var curActiveElement = domUtils.getActiveElement(),
+                curDocument      = domUtils.findDocument(curActiveElement);
 
             if (firstElementInnerHTML) {
                 setInnerHTML($('#1'), firstElementInnerHTML);
@@ -81,7 +80,7 @@ $(document).ready(function () {
 
     QUnit.testDone(function () {
         stateHelper.restoreState();
-        if (!browser.isIE)
+        if (!browserUtils.isIE)
             removeTestElements();
     });
 

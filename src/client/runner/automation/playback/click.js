@@ -1,37 +1,35 @@
-import * as hammerheadAPI from '../../deps/hammerhead';
+import hammerhead from '../../deps/hammerhead';
 import testCafeCore from '../../deps/testcafe-core';
 import testCafeUI from '../../deps/testcafe-ui';
 import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
-import movePlaybackAutomation from '../playback/move';
+import MoveAutomation from '../playback/move';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
-var browserUtils   = hammerheadAPI.Util.Browser;
-var eventSimulator = hammerheadAPI.EventSandbox.EventSimulator;
-var focusBlur      = hammerheadAPI.EventSandbox.FocusBlur;
-var nativeMethods  = hammerheadAPI.NativeMethods;
+var browserUtils     = hammerhead.utils.browser;
+var eventSimulator   = hammerhead.eventSandbox.eventSimulator;
+var focusBlurSandbox = hammerhead.eventSandbox.focusBlur;
 
-var $             = testCafeCore.$;
 var SETTINGS      = testCafeCore.SETTINGS;
-var ERRORS        = testCafeCore.ERRORS;
 var domUtils      = testCafeCore.domUtils;
 var positionUtils = testCafeCore.positionUtils;
 var styleUtils    = testCafeCore.styleUtils;
 var eventUtils    = testCafeCore.eventUtils;
+var arrayUtils    = testCafeCore.arrayUtils;
 
-var cursor        = testCafeUI.cursor;
 var selectElement = testCafeUI.selectElement;
 
 
-function getSelectChildElementIndex ($select, child) {
-    var $allChildren = child.tagName.toLowerCase() === 'option' ? $select.find('option') : $select.find('optgroup');
+function getSelectChildElementIndex (select, child) {
+    var children = select.querySelectorAll(child.tagName);
 
-    return $.inArray(child, $allChildren);
+    return arrayUtils.indexOf(children, child);
 }
 
 function clickOnSelectChildElement (childElement, clickOptions, actionCallback, errorCallback) {
-    var isClickOnOption = childElement.tagName.toLowerCase() === 'option',
-        select          = domUtils.getSelectParent(childElement);
+    var isClickOnOption = childElement.tagName.toLowerCase() === 'option';
+    var select          = domUtils.getSelectParent(childElement);
 
     if (!select) {
         eventSimulator.click(childElement, clickOptions);
@@ -39,81 +37,77 @@ function clickOnSelectChildElement (childElement, clickOptions, actionCallback, 
         return;
     }
 
-    var $select              = $(select),
-        selectedIndex        = select.selectedIndex,
-        isOptionListExpanded = selectElement.isOptionListExpanded($select),
-        childIndex           = getSelectChildElementIndex($select, childElement),
-        targetElement        = null;
-
-    if (!isOptionListExpanded) {
-        var selectSizeValue = styleUtils.getSelectElementSize(select);
-
-        if ((!SETTINGS.get().RECORDING || SETTINGS.get().PLAYBACK) && selectSizeValue <= 1) {
-            errorCallback({
-                code:    ERRORS.API_INVISIBLE_ACTION_ELEMENT,
-                element: domUtils.getElementDescription(childElement)
-            });
-            return;
-        }
-
-        targetElement = childElement;
-    }
-    else
-        targetElement = selectElement.getEmulatedChildElement(childIndex, !isClickOnOption);
+    var selectedIndex        = select.selectedIndex;
+    var isOptionListExpanded = selectElement.isOptionListExpanded(select);
+    var childIndex           = getSelectChildElementIndex(select, childElement);
+    var targetElement        = isOptionListExpanded ? selectElement.getEmulatedChildElement(childIndex, !isClickOnOption) : childElement;
 
     async.series({
             moveCursorToElement: function (callback) {
                 //NOTE: 'target' is option from emulated optionList or the point (x,y-coordinates) of real option element
-                var target = null;
+                var target            = null;
+                var offsets           = null;
+                var selectChildCenter = null;
 
-                if (isOptionListExpanded)
-                    target = targetElement;
+                if (isOptionListExpanded) {
+                    target  = targetElement;
+                    offsets = automationUtil.getDefaultAutomationOffsets(target);
+                }
                 else {
                     selectElement.scrollOptionListByChild(childElement);
-                    target = selectElement.getSelectChildCenter(childElement);
+                    target            = document.documentElement;
+                    selectChildCenter = selectElement.getSelectChildCenter(childElement);
+                    offsets           = {
+                        offsetX: selectChildCenter.x,
+                        offsetY: selectChildCenter.y
+                    };
                 }
 
-                movePlaybackAutomation(target, false, {}, function () {
-                    window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
-                });
+                var moveAutomation = new MoveAutomation(target, offsets);
+
+                moveAutomation
+                    .run()
+                    .then(() => window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY));
             },
 
             click: function () {
-                var clickLeadChanges = isClickOnOption && !targetElement.disabled;
+                var clickCausesChange = isClickOnOption && !targetElement.disabled && childIndex !== selectedIndex;
 
-                if (styleUtils.getSelectElementSize($select[0]) > 1) {
-                    if (browserUtils.isMozilla) {
+                if (styleUtils.getSelectElementSize(select) > 1) {
+                    if (browserUtils.isFirefox) {
                         eventSimulator.mousedown(targetElement, clickOptions);
 
-                        if (clickLeadChanges)
-                            $select[0].selectedIndex = childIndex;
+                        if (clickCausesChange)
+                            select.selectedIndex = childIndex;
 
-                        focusBlur.focus($select[0], function () {
+                        focusBlurSandbox.focus(select, function () {
                             window.setTimeout(function () {
                                 eventSimulator.mouseup(targetElement, clickOptions);
 
-                                if (isClickOnOption && $(childElement).index() !== selectedIndex)
-                                    eventSimulator.change($select[0]);
+                                if (clickCausesChange)
+                                    eventSimulator.change(select);
 
                                 eventSimulator.click(targetElement, clickOptions);
+
                                 actionCallback();
                             }, browserUtils.hasTouchEvents ? 0 : automationSettings.CLICK_STEP_DELAY);
                         }, false, true);
                     }
                     else if (browserUtils.isIE) {
-                        eventSimulator.mousedown($select[0], clickOptions);
+                        eventSimulator.mousedown(select, clickOptions);
 
-                        focusBlur.focus($select[0], function () {
+                        focusBlurSandbox.focus(select, function () {
                             window.setTimeout(function () {
-                                eventSimulator.mouseup($select[0], clickOptions);
+                                eventSimulator.mouseup(select, clickOptions);
 
-                                if (clickLeadChanges)
-                                    $select[0].selectedIndex = childIndex;
+                                if (clickCausesChange)
+                                    select.selectedIndex = childIndex;
 
-                                if (isClickOnOption && $(childElement).index() !== selectedIndex)
-                                    eventSimulator.change($select[0]);
+                                if (clickCausesChange)
+                                    eventSimulator.change(select);
 
-                                eventSimulator.click($select[0], clickOptions);
+                                eventSimulator.click(select, clickOptions);
+
                                 actionCallback();
                             }, browserUtils.hasTouchEvents ? 0 : automationSettings.CLICK_STEP_DELAY);
                         }, false, true);
@@ -122,16 +116,20 @@ function clickOnSelectChildElement (childElement, clickOptions, actionCallback, 
                         //NOTE: after mousedown in Chrome document.activeElement = select.
                         //But we need to raise blur and change event for previous active element during focus raising.
                         //That's why we should change event order and raise focus before mousedown.
-                        focusBlur.focus($select[0], function () {
+                        focusBlurSandbox.focus(select, function () {
                             window.setTimeout(function () {
                                 eventSimulator.mousedown(targetElement, clickOptions);
 
-                                if (clickLeadChanges)
-                                    $select[0].selectedIndex = childIndex;
+                                if (clickCausesChange)
+                                    select.selectedIndex = childIndex;
 
                                 eventSimulator.mouseup(targetElement, clickOptions);
 
+                                if (browserUtils.isSafari && clickCausesChange)
+                                    eventSimulator.change(select);
+
                                 eventSimulator.click(targetElement, clickOptions);
+
                                 actionCallback();
                             }, browserUtils.hasTouchEvents ? 0 : automationSettings.CLICK_STEP_DELAY);
                         }, false, true);
@@ -164,22 +162,35 @@ export default function (el, options, runCallback, errorCallback) {
         return;
     }
 
-    var isSvgElement        = domUtils.isSvgElement(el),
+    var isSVGElement        = domUtils.isSVGElement(el),
         screenPoint         = null,
         eventPoint          = null,
         eventOptions        = null,
-        target              = positionUtils.isContainOffset(el, options.offsetX, options.offsetY) ?
-                              el : automationUtil.getMouseActionPoint(el, options, false),
+        clickOnElement      = positionUtils.isContainOffset(el, options.offsetX, options.offsetY),
+        target              = clickOnElement ? el : automationUtil.getMouseActionPoint(el, options, false),
+        targetElement       = clickOnElement ? el : document.documentElement,
         notPrevented        = true,
         topElement          = null,
         isInvisibleElement  = false,
         currentTopElement   = null,
-        skipClickSimulation = false;
+        skipClickSimulation = false,
+        offsets             = clickOnElement ? automationUtil.getDefaultAutomationOffsets(el) : {
+            offsetX: target.x,
+            offsetY: target.y
+        },
+        modifiers           = {
+            ctrl:  options.ctrl,
+            shift: options.shift,
+            alt:   options.alt,
+            meta:  options.meta
+        };
 
-    if (options.offsetX)
-        options.offsetX = Math.round(options.offsetX);
-    if (options.offsetY)
-        options.offsetY = Math.round(options.offsetY);
+    if (clickOnElement) {
+        if (typeof options.offsetX === 'number')
+            offsets.offsetX = Math.round(options.offsetX);
+        if (typeof options.offsetY === 'number')
+            offsets.offsetY = Math.round(options.offsetY);
+    }
 
     async.series({
         moveCursorToElement: function (callback) {
@@ -190,27 +201,31 @@ export default function (el, options, runCallback, errorCallback) {
                 return;
             }
 
-            movePlaybackAutomation(target, false, options, function () {
-                if ((isSvgElement && browserUtils.isOpera) || ($(el).is('tref')))
-                    topElement = el; //NOTE: document.elementFromPoint can't find this element
-                else {
-                    screenPoint = automationUtil.getMouseActionPoint(el, options, true);
-                    eventPoint  = automationUtil.getEventOptionCoordinates(el, screenPoint);
+            var moveAutomation = new MoveAutomation(targetElement, offsets, { modifiers });
 
-                    eventOptions = $.extend({
-                        clientX: eventPoint.x,
-                        clientY: eventPoint.y
-                    }, options);
+            moveAutomation
+                .run()
+                .then(() => {
+                    if ((isSVGElement && browserUtils.isOpera) || el.tagName.toLowerCase() === 'tref')
+                        topElement = el; //NOTE: document.elementFromPoint can't find this element
+                    else {
+                        screenPoint = automationUtil.getMouseActionPoint(el, options, true);
+                        eventPoint  = automationUtil.getEventOptionCoordinates(el, screenPoint);
 
-                    topElement = automationUtil.getElementUnderCursor(screenPoint.x, screenPoint.y, null, target);
+                        eventOptions = hammerhead.utils.extend({
+                            clientX: eventPoint.x,
+                            clientY: eventPoint.y
+                        }, options);
 
-                    if (!topElement) {
-                        isInvisibleElement = true;
-                        topElement         = el;
+                        topElement = automationUtil.getElementUnderCursor(screenPoint.x, screenPoint.y, null, target);
+
+                        if (!topElement) {
+                            isInvisibleElement = true;
+                            topElement         = el;
+                        }
                     }
-                }
-                window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
-            });
+                    window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
+                });
         },
 
         //NOTE: touch devices only
@@ -222,8 +237,10 @@ export default function (el, options, runCallback, errorCallback) {
 
         //NOTE: touch devices only
         cursorTouchMouseDown: function (callback) {
-            if (browserUtils.hasTouchEvents)
-                cursor.lMouseDown(callback);
+            if (browserUtils.hasTouchEvents) {
+                Cursor.leftButtonDown()
+                    .then(callback);
+            }
             else
                 callback();
         },
@@ -240,8 +257,10 @@ export default function (el, options, runCallback, errorCallback) {
         },
 
         cursorMouseDown: function (callback) {
-            if (!browserUtils.hasTouchEvents)
-                cursor.lMouseDown(callback);
+            if (!browserUtils.hasTouchEvents) {
+                Cursor.leftButtonDown()
+                    .then(callback);
+            }
             else
                 callback();
         },
@@ -249,31 +268,34 @@ export default function (el, options, runCallback, errorCallback) {
         mousedown: function (callback) {
             //NOTE: in webkit and ie raising mousedown event opens select element's dropdown,
             // therefore we should handle it and hide the dropdown (B236416)
-            var needHandleMousedown = (browserUtils.isWebKit || browserUtils.isIE) && domUtils.isSelectElement(el),
-                wasPrevented        = null,
-                blurRaised          = false,
-                activeElement       = domUtils.getActiveElement(),
-                //in IE focus is not raised if element was focused before click, even if focus is lost during mousedown
-                needFocus           = !(browserUtils.isIE && activeElement === topElement),
-                mouseDownCallback   = function () {
-                    window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
-                };
+            var needHandleMousedown = (browserUtils.isWebKit || browserUtils.isIE) && domUtils.isSelectElement(el);
+            var wasPrevented        = null;
+            var blurRaised          = false;
+            var activeElement       = domUtils.getActiveElement();
+
+            //in IE focus is not raised if element was focused before click, even if focus is lost during mousedown
+            var isContentEditableBody = topElement.tagName.toLowerCase() === 'body' &&
+                                        domUtils.isContentEditableElement(topElement);
+            var needFocus             = !browserUtils.isIE || activeElement !== topElement || isContentEditableBody;
+
+            var mouseDownCallback = () => window.setTimeout(callback, automationSettings.ACTION_STEP_DELAY);
 
             if (needHandleMousedown) {
                 var onmousedown = function (e) {
                     wasPrevented = e.defaultPrevented;
                     eventUtils.preventDefault(e);
-                    nativeMethods.removeEventListener.call(el, 'mousedown', onmousedown, false);
+                    eventUtils.unbind(el, 'mousedown', onmousedown);
                 };
 
-                nativeMethods.addEventListener.call(el, 'mousedown', onmousedown, false);
+                eventUtils.bind(el, 'mousedown', onmousedown);
             }
 
             var onblur = function () {
                 blurRaised = true;
-                nativeMethods.removeEventListener.call(activeElement, 'blur', onblur, true);
+                eventUtils.unbind(activeElement, 'blur', onblur, true);
             };
-            nativeMethods.addEventListener.call(activeElement, 'blur', onblur, true);
+
+            eventUtils.bind(activeElement, 'blur', onblur, true);
 
             notPrevented = eventSimulator.mousedown(topElement, eventOptions);
 
@@ -313,7 +335,8 @@ export default function (el, options, runCallback, errorCallback) {
         },
 
         cursorMouseUp: function (callback) {
-            cursor.mouseUp(callback);
+            Cursor.buttonUp()
+                .then(callback);
         },
 
         mouseup: function (callback) {
@@ -326,8 +349,6 @@ export default function (el, options, runCallback, errorCallback) {
         },
 
         click: function () {
-            var $el = $(topElement);
-
             if ((!SETTINGS.get().RECORDING || SETTINGS.get().PLAYBACK) &&
                 topElement.tagName.toLowerCase() === 'option') {
                 runCallback();
@@ -335,17 +356,16 @@ export default function (el, options, runCallback, errorCallback) {
             }
 
             if (topElement.tagName.toLowerCase() === 'option') {
-                var select  = domUtils.getSelectParent(topElement),
-                    $select = $(select);
+                var select = domUtils.getSelectParent(topElement);
 
                 if (select && ((browserUtils.isWebKit && styleUtils.getSelectElementSize(select) <= 1) ||
                                (browserUtils.isIE && styleUtils.getSelectElementSize(select) > 1)))
-                    eventSimulator.click($select[0], eventOptions);
+                    eventSimulator.click(select, eventOptions);
                 else
-                    eventSimulator.click($el[0], eventOptions);
+                    eventSimulator.click(topElement, eventOptions);
 
                 if (select)
-                    eventSimulator.change($select[0]);
+                    eventSimulator.change(select);
 
                 runCallback();
                 return;
@@ -362,7 +382,7 @@ export default function (el, options, runCallback, errorCallback) {
             if ((!SETTINGS.get().RECORDING || SETTINGS.get().PLAYBACK) && domUtils.isSelectElement(topElement) &&
                 styleUtils.getSelectElementSize(topElement) === 1 && notPrevented !== false) {
                 //if this select already have options list
-                if (selectElement.isOptionListExpanded($el))
+                if (selectElement.isOptionListExpanded(topElement))
                     selectElement.collapseOptionList();
                 else
                     selectElement.expandOptionList(topElement);

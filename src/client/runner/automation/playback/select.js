@@ -1,27 +1,25 @@
-import * as hammerheadAPI from '../../deps/hammerhead';
+import hammerhead from '../../deps/hammerhead';
 import testCafeCore from '../../deps/testcafe-core';
 import testCafeUI from '../../deps/testcafe-ui';
 import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
 import * as automationSelectUtil from './select-util';
-import movePlaybackAutomation from '../playback/move';
-import scrollPlaybackAutomation from '../playback/scroll';
+import MoveAutomation from '../playback/move';
+import ScrollAutomation from '../playback/scroll';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
-var browserUtils   = hammerheadAPI.Util.Browser;
-var eventSimulator = hammerheadAPI.EventSandbox.EventSimulator;
-var focusBlur      = hammerheadAPI.EventSandbox.FocusBlur;
-var nativeMethods  = hammerheadAPI.NativeMethods;
+var browserUtils     = hammerhead.utils.browser;
+var extend           = hammerhead.utils.extend;
+var eventSimulator   = hammerhead.eventSandbox.eventSimulator;
+var focusBlurSandbox = hammerhead.eventSandbox.focusBlur;
 
-var $               = testCafeCore.$;
 var SETTINGS        = testCafeCore.SETTINGS;
 var contentEditable = testCafeCore.contentEditable;
 var textSelection   = testCafeCore.textSelection;
 var domUtils        = testCafeCore.domUtils;
 var positionUtils   = testCafeCore.positionUtils;
 var eventUtils      = testCafeCore.eventUtils;
-
-var cursor = testCafeUI.cursor;
 
 
 export default function (el, options, runCallback) {
@@ -47,7 +45,13 @@ export default function (el, options, runCallback) {
         point             = null,
 
         //NOTE: options to get right selection position to mouse movement
-        correctOptions    = null;
+        correctOptions    = null,
+        modifiers         = {
+            ctrl:  options.ctrl,
+            shift: options.shift,
+            alt:   options.alt,
+            meta:  options.meta
+        };
 
     //determination of selection positions by arguments
     var processedOptions = automationSelectUtil.getProcessedOptions(el, options);
@@ -64,13 +68,20 @@ export default function (el, options, runCallback) {
 
     async.series({
         scrollToElement: function (callback) {
-            scrollPlaybackAutomation(el, {}, null, function () {
+            var elementRectangle = positionUtils.getElementRectangle(el);
+            var scrollAutomation = new ScrollAutomation(el, {
+                offsetX: Math.round(elementRectangle.width / 2),
+                offsetY: Math.round(elementRectangle.height / 2)
+            });
+
+            scrollAutomation
+                .run()
+                .then(() => {
                     automationSelectUtil.getCorrectOptions(el, function (opt) {
                         correctOptions = opt;
                         callback();
                     });
-                }
-            );
+                });
         },
 
         moveToStart: function (callback) {
@@ -88,31 +99,39 @@ export default function (el, options, runCallback) {
 
             point = automationSelectUtil.updatePointByScrollElement(el, pointFrom);
 
-            movePlaybackAutomation(point, false, options, function () {
-                screenPointFrom = positionUtils.offsetToClientCoords(point);
-                eventPointFrom  = automationUtil.getEventOptionCoordinates(el, screenPointFrom);
+            var moveAutomation = new MoveAutomation(document.documentElement, {
+                offsetX: point.x,
+                offsetY: point.y
+            }, { modifiers });
 
-                eventOptionsStart = $.extend({
-                    clientX: eventPointFrom.x,
-                    clientY: eventPointFrom.y
-                }, options);
+            moveAutomation
+                .run()
+                .then(() => {
+                    screenPointFrom = positionUtils.offsetToClientCoords(point);
+                    eventPointFrom  = automationUtil.getEventOptionCoordinates(el, screenPointFrom);
 
-                topElement = cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
+                    eventOptionsStart = extend({
+                        clientX: eventPointFrom.x,
+                        clientY: eventPointFrom.y
+                    }, options);
 
-                if (!topElement) {
-                    runCallback();
-                    return;
-                }
+                    topElement = Cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
 
-                isTextEditable = domUtils.isTextEditableElement(topElement);
-                isTextarea     = topElement.tagName.toLowerCase() === 'textarea';
+                    if (!topElement) {
+                        runCallback();
+                        return;
+                    }
 
-                window.setTimeout(callback, automationSettings.DRAG_ACTION_STEP_DELAY);
-            });
+                    isTextEditable = domUtils.isTextEditableElement(topElement);
+                    isTextarea     = topElement.tagName.toLowerCase() === 'textarea';
+
+                    window.setTimeout(callback, automationSettings.DRAG_ACTION_STEP_DELAY);
+                });
         },
 
         cursorMousseDown: function (callback) {
-            cursor.lMouseDown(callback);
+            Cursor.leftButtonDown()
+                .then(callback);
         },
 
         mousedown: function (callback) {
@@ -125,10 +144,10 @@ export default function (el, options, runCallback) {
                 var onmousedown = function (e) {
                     wasPrevented = e.defaultPrevented;
                     eventUtils.preventDefault(e);
-                    nativeMethods.removeEventListener.call(el, 'mousedown', onmousedown, false);
+                    eventUtils.unbind(el, 'mousedown', onmousedown);
                 };
 
-                nativeMethods.addEventListener.call(el, 'mousedown', onmousedown, false);
+                eventUtils.bind(el, 'mousedown', onmousedown);
             }
 
             if (browserUtils.hasTouchEvents)
@@ -136,7 +155,7 @@ export default function (el, options, runCallback) {
             else
                 notPrevented = eventSimulator.mousedown(topElement, eventOptionsStart);
 
-            currentTopElement = cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
+            currentTopElement = Cursor.getElementUnderCursor(screenPointFrom.x, screenPointFrom.y);
 
             if (currentTopElement)
                 topElement = currentTopElement;
@@ -155,7 +174,7 @@ export default function (el, options, runCallback) {
             if (isContentEditable)
                 topElement = el;
 
-            focusBlur.focus(isContentEditable ? contentEditable.findContentEditableParent(topElement) : topElement, function () {
+            focusBlurSandbox.focus(isContentEditable ? contentEditable.findContentEditableParent(topElement) : topElement, function () {
                 pointTo = automationSelectUtil.getSelectPositionCoordinates(topElement, startPosition, endPosition, false, correctOptions);
 
                 if (isContentEditable && !pointTo) {
@@ -166,9 +185,14 @@ export default function (el, options, runCallback) {
                 automationSelectUtil.scrollElementByPoint(topElement, pointTo);
                 pointTo = automationSelectUtil.updatePointByScrollElement(topElement, pointTo);
 
-                movePlaybackAutomation(pointTo, false, options, function () {
-                    callback();
-                });
+                var moveAutomation = new MoveAutomation(document.documentElement, {
+                    offsetX: pointTo.x,
+                    offsetY: pointTo.y
+                }, { modifiers });
+
+                moveAutomation
+                    .run()
+                    .then(callback);
             }, false, true);
         },
 
@@ -200,7 +224,7 @@ export default function (el, options, runCallback) {
             screenPointTo = positionUtils.offsetToClientCoords(point);
             eventPointTo  = automationUtil.getEventOptionCoordinates(topElement, screenPointTo);
 
-            eventOptionsEnd = $.extend({
+            eventOptionsEnd = extend({
                 clientX: eventPointTo.x,
                 clientY: eventPointTo.y
             }, options);
@@ -217,7 +241,8 @@ export default function (el, options, runCallback) {
         },
 
         cursorMouseUp: function (callback) {
-            cursor.mouseUp(callback);
+            Cursor.buttonUp()
+                .then(callback);
         },
 
         mouseup: function () {

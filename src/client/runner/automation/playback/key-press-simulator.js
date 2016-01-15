@@ -1,18 +1,20 @@
-import * as hammerheadAPI from '../../deps/hammerhead';
+import hammerhead from '../../deps/hammerhead';
 import testCafeCore from '../../deps/testcafe-core';
 import typeCharPlaybackAutomation from '../playback/type-char';
 import async from '../../deps/async';
 
-var browserUtils          = hammerheadAPI.Util.Browser;
-var eventSimulator        = hammerheadAPI.EventSandbox.EventSimulator;
-var focusBlur             = hammerheadAPI.EventSandbox.FocusBlur;
-var nativeMethods         = hammerheadAPI.NativeMethods;
-var elementEditingWatcher = hammerheadAPI.EventSandbox.ElementEditingWatcher;
 
-var $             = testCafeCore.$;
+var browserUtils          = hammerhead.utils.browser;
+var extend                = hammerhead.utils.extend;
+var eventSimulator        = hammerhead.eventSandbox.eventSimulator;
+var focusBlurSandbox      = hammerhead.eventSandbox.focusBlur;
+var elementEditingWatcher = hammerhead.eventSandbox.elementEditingWatcher;
+
 var domUtils      = testCafeCore.domUtils;
 var keyCharUtils  = testCafeCore.keyCharUtils;
 var textSelection = testCafeCore.textSelection;
+var eventUtils    = testCafeCore.eventUtils;
+var arrayUtils    = testCafeCore.arrayUtils;
 
 
 const KEY_PRESS_DELAY = 80;
@@ -46,7 +48,7 @@ var keyHelper = function (key) {
 
             if (modifierKeyCode)
                 modifiersState[sanitizedKey] = true;
-            return eventSimulator.keydown(activeElement, $.extend({ keyCode: keyCode }, modifiersState));
+            return eventSimulator.keydown(activeElement, extend({ keyCode: keyCode }, modifiersState));
         },
 
         press: function (modifiersState) {
@@ -79,19 +81,19 @@ var keyHelper = function (key) {
             beforeKeypressActiveElement = activeElement;
             var raiseDefault            = eventSimulator.keypress(
                 activeElement,
-                $.extend({ keyCode: charCode, charCode: charCode }, modifiersState)
+                extend({ keyCode: charCode, charCode: charCode }, modifiersState)
             );
 
             activeElement = domUtils.getActiveElement();
 
-            var caretPos = domUtils.isInputWithoutSelectionPropertiesInMozilla(activeElement) ? activeElement.value.length : null;
+            var caretPos = domUtils.isInputWithoutSelectionPropertiesInFirefox(activeElement) ? activeElement.value.length : null;
 
             if (raiseDefault) {
                 if (character && !(modifiersState.ctrl || modifiersState.alt)) {
                     //T210448 - Unnecessary typing occurs if element was changed after keydown/keypress event
                     try {
                         if (beforeKeypressActiveElement === activeElement ||
-                            (!(browserUtils.isMozilla && !domUtils.isEditableElement(beforeKeypressActiveElement)) &&
+                            (!(browserUtils.isFirefox && !domUtils.isEditableElement(beforeKeypressActiveElement)) &&
                              !(browserUtils.isWebKit && domUtils.isElementInIframe(activeElement) !==
                                                         domUtils.isElementInIframe(beforeKeypressActiveElement) &&
                              !domUtils.isEditableElement(beforeKeypressActiveElement)))) {
@@ -122,7 +124,7 @@ var keyHelper = function (key) {
             if (modifierKeyCode)
                 modifiersState[sanitizedKey] = false;
 
-            var raiseDefault  = eventSimulator.keyup(domUtils.getActiveElement(), $.extend({ keyCode: keyCode }, modifiersState)),
+            var raiseDefault  = eventSimulator.keyup(domUtils.getActiveElement(), extend({ keyCode: keyCode }, modifiersState)),
 
                 activeElement = domUtils.getActiveElement();
 
@@ -163,13 +165,13 @@ var supportedShortcutHandlers = (function () {
     function onTextAreaBlur () {
         curTextareaElement      = null;
         curTextareaCursorIndent = null;
-        nativeMethods.removeEventListener.call(this, 'blur', onTextAreaBlur, true);
+        eventUtils.unbind(this, 'blur', onTextAreaBlur, true);
     }
 
     function updateTextAreaIndent (element) {
         if (element.tagName.toLowerCase() === 'textarea') {
             if (curTextareaElement !== element) {
-                nativeMethods.addEventListener.call(element, 'blur', onTextAreaBlur, true);
+                eventUtils.bind(element, 'blur', onTextAreaBlur, true);
                 curTextareaElement = element;
             }
 
@@ -558,35 +560,37 @@ var supportedShortcutHandlers = (function () {
             if (!browserUtils.isIE)
                 elementEditingWatcher.processElementChanging(element);
 
-            var $form = $(element).parents('form:first');
-            if ($form.length) {
+            var form = domUtils.getParents(element, 'form')[0];
 
+            if (form) {
                 //if user presses enter when form input is focused, and the form has a submit button,
                 //  browser sends click event to the submit button
-                var $submitButton = $form.find('input[type=submit]:enabled,button[type=submit]:enabled');
-                if (!$submitButton.length)
-                //if button type is not declared, it becomes submit button by default
-                    $submitButton = $form.find('button:enabled').filter(function () {
-                        return this.type === 'submit';
-                    });
-                if ($submitButton.length)
-                    eventSimulator.click($submitButton[0]);
+                var buttons      = form.querySelectorAll('input, button');
+                var submitButton = null;
 
+                for (var i = 0; i < buttons.length; i++) {
+                    if (!submitButton && buttons[i].type === 'submit' && !buttons[i].disabled) {
+                        submitButton = buttons[i];
+                        break;
+                    }
+                }
+
+                if (submitButton)
+                    eventSimulator.click(submitButton);
                 else {
-                    //the form is also submitted on enter press if there is only one input of the following types on it
-                    //  and this input is focused (http://www.w3.org/TR/html5/forms.html#implicit-submission)
-                    var textInputTagNameRegExp = browserUtils.isWebKit ? /^(text|search|url|number|tel|password|number|email)$/i :
-                                                 /^(text|search|url|number|tel|password|number|email|date|time)$/i;
+                    if (domUtils.blocksImplicitSubmission(element)) {
+                        var formInputs = form.getElementsByTagName('input');
+                        var textInputs = [];
 
-                    if (textInputTagNameRegExp.test(element.type)) {
-                        var $textInputs = $form.find('input').filter(function () {
-                            return textInputTagNameRegExp.test(this.type);
-                        });
+                        for (var i = 0; i < formInputs.length; i++) {
+                            if (domUtils.blocksImplicitSubmission(formInputs[i]))
+                                textInputs.push(formInputs[i]);
+                        }
 
-                        if ($textInputs.length === 1 && $textInputs[0] === element &&
-                            (!element.validity || element.validity.valid)) {
-                            if (eventSimulator.submit($form[0]))
-                                $form[0].submit();
+                        if (textInputs.length === 1 && textInputs[0] === element &&
+                            (browserUtils.isSafari || !element.validity || element.validity.valid)) {
+                            if (eventSimulator.submit(form))
+                                form.submit();
                         }
                     }
                 }
@@ -611,7 +615,10 @@ var supportedShortcutHandlers = (function () {
     function focusNextElement (element, callback) {
         var nextElement = domUtils.getNextFocusableElement(element);
 
-        focusBlur.focus(nextElement, function () {
+        if (!nextElement)
+            return;
+
+        focusBlurSandbox.focus(nextElement, function () {
             if (domUtils.isTextEditableInput(nextElement))
                 textSelection.select(nextElement);
 
@@ -622,7 +629,10 @@ var supportedShortcutHandlers = (function () {
     function focusPrevElement (element, callback) {
         var prevElement = domUtils.getNextFocusableElement(element, true);
 
-        focusBlur.focus(prevElement, function () {
+        if (!prevElement)
+            return;
+
+        focusBlurSandbox.focus(prevElement, function () {
             if (domUtils.isTextEditableInput(prevElement))
                 textSelection.select(prevElement);
 
@@ -696,9 +706,7 @@ export default function (keysString, actionCallback) {
         }
     }
 
-    var keysHelpers = $.map(keys, function (key) {
-        return keyHelper(key);
-    });
+    var keysHelpers = arrayUtils.map(keys, keyHelper);
 
     //press keys
     var pressedKeyHelpers  = [],
@@ -724,7 +732,7 @@ export default function (keysString, actionCallback) {
                     else {
                         var currentShortcutHandler = keysCombinationHandlers[currentCombination];
 
-                        if (!currentShortcutHandler || browserUtils.isMozilla || key === 'enter')  //B254435
+                        if (!currentShortcutHandler || browserUtils.isFirefox || key === 'enter')  //B254435
                             preventDefault = !helper.press(modifiersState);
 
                         if (!preventDefault && currentShortcutHandler)

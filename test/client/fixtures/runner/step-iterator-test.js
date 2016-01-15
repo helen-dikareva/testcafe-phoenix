@@ -1,51 +1,53 @@
 var testCafeCore = window.getTestCafeModule('testCafeCore');
-var COMMANDS     = testCafeCore.get('./service-msg-cmd');
-var ERRORS       = testCafeCore.get('./errors');
+var COMMAND      = testCafeCore.COMMAND;
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
 var SETTINGS     = testCafeCore.get('./settings').get();
 var transport    = testCafeCore.get('./transport');
-var event        = testCafeCore.get('./util/event');
+var eventUtils   = testCafeCore.get('./utils/event');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var StepIterator   = testCafeRunner.get('./step-iterator');
 
-var stepIterator    = null,
-    nextStep        = 0,
-    stepsSharedData = null,
-    states          = [],
-    onError         = null;
+var stepIterator            = null,
+    nextStep                = 0,
+    stepsSharedData         = null,
+    states                  = [],
+    onError                 = null,
+    onStepIteratorCompleted = null;
 
 QUnit.testStart(function () {
-    stepIterator    = new StepIterator();
-    nextStep        = 0;
-    stepsSharedData = null;
-    states          = [];
-    onError         = null;
+    stepIterator            = new StepIterator();
+    nextStep                = 0;
+    stepsSharedData         = null;
+    states                  = [];
+    onError                 = null;
+    onStepIteratorCompleted = null;
 
     stepIterator.on(StepIterator.NEXT_STEP_STARTED_EVENT, function (e) {
-        states.push(COMMANDS.SET_NEXT_STEP);
+        states.push(COMMAND.setNextStep);
         nextStep = e.nextStep;
         e.callback();
     });
 
     stepIterator.on(StepIterator.SET_STEPS_SHARED_DATA_EVENT, function (e) {
-        states.push(COMMANDS.SET_STEPS_SHARED_DATA);
+        states.push(COMMAND.setStepsSharedData);
         stepsSharedData = e.stepsSharedData;
         e.callback();
     });
 
     stepIterator.on(StepIterator.GET_STEPS_SHARED_DATA_EVENT, function (e) {
-        states.push(COMMANDS.GET_STEPS_SHARED_DATA);
+        states.push(COMMAND.getStepsSharedData);
         e.callback(stepsSharedData);
-    });
-
-    stepIterator.on(StepIterator.TEST_COMPLETE_EVENT, function () {
-        states.push(COMMANDS.TEST_COMPLETE);
-        transport.switchToWorkerIdle();
     });
 
     stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
         if (typeof onError === 'function')
             onError(err);
+    });
+
+    stepIterator.on(StepIterator.TEST_COMPLETE_EVENT, function () {
+        if (typeof onStepIteratorCompleted === 'function')
+            onStepIteratorCompleted();
     });
 });
 
@@ -134,44 +136,37 @@ $(document).ready(function () {
             states.push('step' + SETTINGS.CURRENT_TEST_STEP_NAME + '_done');
         };
 
-        transport.switchToWorkerIdle = function () {
-            states.push('switchToWorkerIdle');
-            deepEqual(states, expectedStates);
-            start();
-        };
-
         var expectedStates = [
-            COMMANDS.GET_STEPS_SHARED_DATA,
-            COMMANDS.SET_NEXT_STEP,
+            COMMAND.getStepsSharedData,
+            COMMAND.setNextStep,
             'step0_setup',
             'step0',
             'step0_action',
             'step0_done',
-            COMMANDS.SET_NEXT_STEP,
+            COMMAND.setNextStep,
             'step1_setup',
             'step1',
-            COMMANDS.SET_STEPS_SHARED_DATA,
+            COMMAND.setStepsSharedData,
             'step1_action',
             'step1_done',
-            COMMANDS.SET_NEXT_STEP,
+            COMMAND.setNextStep,
             'step2_setup',
             'step2',
             'step2_action',
             'step2_done',
-            COMMANDS.SET_NEXT_STEP,
+            COMMAND.setNextStep,
             'step3_setup',
             'step3',
-            ERRORS.UNCAUGHT_JS_ERROR_IN_TEST_CODE_STEP,
-            COMMANDS.GET_STEPS_SHARED_DATA,
+            ERROR_TYPE.uncaughtJSErrorInTestCodeStep,
+            COMMAND.getStepsSharedData,
             'step3_done',
-            COMMANDS.SET_NEXT_STEP,
+            COMMAND.setNextStep,
             'step4_setup',
             'step4',
             'step4_0_action',
             'step4_1_action',
             'step4_done',
-            COMMANDS.TEST_COMPLETE,
-            'switchToWorkerIdle'
+            COMMAND.done
         ];
 
         expect(8);
@@ -179,9 +174,15 @@ $(document).ready(function () {
         //NOTE: simulate execution interruption (see 2nd step)
         onError = function (err) {
             stepIterator.state.stoppedOnFail = false;
-            states.push(err.code);
+            states.push(err.type);
             stepIterator.start(stepNames, steps, stepSetup, stepDone, nextStep);
             onError                          = null;
+        };
+
+        onStepIteratorCompleted = function () {
+            states.push(COMMAND.done);
+            deepEqual(states, expectedStates);
+            start();
         };
 
         stepIterator.start(stepNames, steps, stepSetup, stepDone, 0);
@@ -229,38 +230,31 @@ $(document).ready(function () {
             callback();
         }, 1000);
 
-        transport.switchToWorkerIdle = function () {
-            states.push('switchToWorkerIdle');
-            deepEqual(states, expectedStates);
-            start();
-        };
-
         var expectedStates = [
-            COMMANDS.GET_STEPS_SHARED_DATA,
-            COMMANDS.SET_NEXT_STEP,
-            COMMANDS.INACTIVITY_EXPECTED,
+            COMMAND.getStepsSharedData,
+            COMMAND.setNextStep,
             'step0_pre_setup',
             'step0_setup',
             'step0',
             'step0_action',
             'step0_done',
-            COMMANDS.SET_NEXT_STEP,
-            COMMANDS.INACTIVITY_EXPECTED,
+            COMMAND.setNextStep,
             'step1_pre_setup',
             'step1_setup',
             'step1',
             'step1_action',
             'step1_done',
-            COMMANDS.TEST_COMPLETE,
-            'switchToWorkerIdle'
+            COMMAND.done
         ];
 
         expect(1);
 
-        stepIterator.expectInactivity = function (timeout, callback) {
-            states.push(COMMANDS.INACTIVITY_EXPECTED);
-            callback();
+        onStepIteratorCompleted = function () {
+            states.push(COMMAND.done);
+            deepEqual(states, expectedStates);
+            start();
         };
+
         stepIterator.start(stepNames, steps, stepSetup, stepDone, 0);
     });
 
@@ -295,33 +289,21 @@ $(document).ready(function () {
             states.push('step' + SETTINGS.CURRENT_TEST_STEP_NAME + '_pre_setup');
         }, 1000);
 
-        transport.switchToWorkerIdle = function () {
-            states.push('switchToWorkerIdle');
-            deepEqual(states, expectedStates);
-            start();
-        };
-
         var expectedStates = [
-            COMMANDS.GET_STEPS_SHARED_DATA,
-            COMMANDS.SET_NEXT_STEP,
-            COMMANDS.INACTIVITY_EXPECTED,
+            COMMAND.getStepsSharedData,
+            COMMAND.setNextStep,
             'step0_pre_setup',
-            ERRORS.API_WAIT_FOR_ACTION_TIMEOUT_EXCEEDED,
-            COMMANDS.TEST_COMPLETE,
-            'switchToWorkerIdle'
+            ERROR_TYPE.waitForActionTimeoutExceeded,
+            COMMAND.done
         ];
 
         expect(1);
 
         onError = function (err) {
-            states.push(err.code);
-            states.push(COMMANDS.TEST_COMPLETE);
-            transport.switchToWorkerIdle();
-        };
-
-        stepIterator.expectInactivity = function (timeout, callback) {
-            states.push(COMMANDS.INACTIVITY_EXPECTED);
-            callback();
+            states.push(err.type);
+            states.push(COMMAND.done);
+            deepEqual(states, expectedStates);
+            start();
         };
 
         stepIterator.start(stepNames, steps, stepSetup, stepDone, 0);
@@ -336,7 +318,7 @@ $(document).ready(function () {
 
         $a.on('click', function (e) {
             clickRaised = true;
-            event.preventDefault(e, false);
+            eventUtils.preventDefault(e, false);
             return false;
         });
 
@@ -364,31 +346,21 @@ $(document).ready(function () {
             }
         ];
 
-        transport.switchToWorkerIdle = function () {
-            states.push('switchToWorkerIdle');
-            deepEqual(states, expectedStates);
-            start();
-        };
-
         var expectedStates = [
-            COMMANDS.GET_STEPS_SHARED_DATA,
-            COMMANDS.SET_NEXT_STEP,
+            COMMAND.getStepsSharedData,
+            COMMAND.setNextStep,
             'step0',
-            ERRORS.STORE_DOM_NODE_OR_JQUERY_OBJECT,
-            COMMANDS.TEST_COMPLETE,
-            'switchToWorkerIdle'
+            ERROR_TYPE.storeDomNodeOrJqueryObject,
+            COMMAND.done
         ];
 
         expect(1);
 
         onError = function (err) {
-            states.push(err.code);
-            states.push(COMMANDS.TEST_COMPLETE);
-            transport.switchToWorkerIdle();
-        };
-
-        stepIterator.expectInactivity = function (timeout, callback) {
-            callback();
+            states.push(err.type);
+            states.push(COMMAND.done);
+            deepEqual(states, expectedStates);
+            start();
         };
 
         stepIterator.start(stepNames, steps, null, null, 0);

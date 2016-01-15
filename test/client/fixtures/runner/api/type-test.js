@@ -1,9 +1,9 @@
-var hammerhead = window.getTestCafeModule('hammerhead');
-var browser    = hammerhead.Util.Browser;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
 var SETTINGS     = testCafeCore.get('./settings').get();
-var ERRORS       = testCafeCore.get('./errors');
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -53,12 +53,12 @@ $(document).ready(function () {
 
     stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
         stepIterator.state.stoppedOnFail = false;
-        currentErrorCode                 = err.code;
+        currentErrorType                 = err.type;
         currentSourceIndex               = err.__sourceIndex;
     });
 
     var asyncActionCallback,
-        currentErrorCode   = null,
+        currentErrorType   = null,
         currentSourceIndex = null,
         $input,
 
@@ -96,7 +96,7 @@ $(document).ready(function () {
         $('body').focus();
 
         $('.' + TEST_ELEMENT_CLASS).remove();
-        currentErrorCode             = null;
+        currentErrorType             = null;
         currentSourceIndex           = null;
         SETTINGS.ENABLE_SOURCE_INDEX = false;
     });
@@ -241,7 +241,7 @@ $(document).ready(function () {
         };
         actionsAPI.type($('#nonExistentElement'), 'text', '#213');
         setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_EMPTY_FIRST_ARGUMENT, 'correct error code is sent');
+            equal(currentErrorType, ERROR_TYPE.emptyFirstArgument, 'correct error type is sent');
             equal(currentSourceIndex, 213);
             start();
         }, ELEMENT_WAITING_TIMEOUT + 100);
@@ -255,7 +255,7 @@ $(document).ready(function () {
         actionsAPI.type($input, '', '#218');
 
         setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_EMPTY_TYPE_ACTION_ARGUMENT, 'correct error code is sent');
+            equal(currentErrorType, ERROR_TYPE.emptyTypeActionArgument, 'correct error type is sent');
             equal(currentSourceIndex, 218);
             start();
         }, 500);
@@ -368,7 +368,7 @@ $(document).ready(function () {
             },
             function () {
                 equal(inputEventCount, 3);
-                equal($input.val(), browser.isIE ? '12' : '123');
+                equal($input.val(), browserUtils.isIE ? '12' : '123');
             },
             5000
         );
@@ -389,7 +389,7 @@ $(document).ready(function () {
             },
             function () {
                 equal(inputEventCount, 3);
-                equal($input.val(), browser.isIE ? '12' : '123');
+                equal($input.val(), browserUtils.isIE ? '12' : '123');
             },
             5000
         );
@@ -439,7 +439,7 @@ $(document).ready(function () {
     asyncTest('T239547: TD15.1 - Playback problems on https://jsfiddle.net/', function () {
         var $input   = $('<input type="text" />').addClass(TEST_ELEMENT_CLASS).appendTo('body'),
             charCode = 45,
-            keyCode  = browser.isMozilla ? 173 : 189;
+            keyCode  = browserUtils.isFirefox ? 173 : 189;
 
         runAsyncTest(
             function () {

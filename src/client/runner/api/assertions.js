@@ -1,15 +1,15 @@
-import * as hammerheadAPI from '../deps/hammerhead';
+import hammerhead from '../deps/hammerhead';
 import testCafeCore from '../deps/testcafe-core';
 import * as sourceIndexTracker from '../source-index';
 
-var messageSandbox = hammerheadAPI.MessageSandbox;
 
-var $                     = testCafeCore.$;
+var messageSandbox = hammerhead.eventSandbox.message;
+var isJQueryObj    = hammerhead.utils.isJQueryObj;
+
 var SETTINGS              = testCafeCore.SETTINGS;
-var CONST                 = testCafeCore.CONST;
-var ERRORS                = testCafeCore.ERRORS;
+var ERROR_TYPE            = testCafeCore.ERROR_TYPE;
 var CROSS_DOMAIN_MESSAGES = testCafeCore.CROSS_DOMAIN_MESSAGES;
-var serviceUtils          = testCafeCore.serviceUtils;
+var arrayUtils            = testCafeCore.arrayUtils;
 var domUtils              = testCafeCore.domUtils;
 
 
@@ -55,8 +55,8 @@ function getObjectsDiff (actual, expected, comparablePath, checkedElements) {
         return getStringDiff(actual, expected);
 
     //arrays
-    if ($.isArray(actual) || $.isArray(expected)) {
-        return (!($.isArray(actual)) || !($.isArray(expected))) ?
+    if (arrayUtils.isArray(actual) || arrayUtils.isArray(expected)) {
+        return (!(arrayUtils.isArray(actual)) || !(arrayUtils.isArray(expected))) ?
                createDiffObject(actual, expected) :
                getArraysDiff(actual, expected);
     }
@@ -66,10 +66,10 @@ function getObjectsDiff (actual, expected, comparablePath, checkedElements) {
         if (!(isElementsCollection(actual)) || !(isElementsCollection(expected)))
             return createDiffObject(actual, expected);
 
-        var $actual   = $(actual),
-            $expected = $(expected);
+        var actualAsArray   = arrayUtils.toArray(actual),
+            expectedAsArray = arrayUtils.toArray(expected);
 
-        return getArraysDiff($actual.get(), $expected.get()) ? createDiffObject($actual, $expected) : null;
+        return getArraysDiff(actualAsArray, expectedAsArray) ? createDiffObject(actualAsArray, expectedAsArray) : null;
     }
 
     //dom elements
@@ -80,9 +80,9 @@ function getObjectsDiff (actual, expected, comparablePath, checkedElements) {
     }
 
     //jQuery objects
-    if (serviceUtils.isJQueryObj(actual) || serviceUtils.isJQueryObj(expected)) {
-        if (!serviceUtils.isJQueryObj(actual) || !serviceUtils.isJQueryObj(expected) ||
-            getArraysDiff(actual.get(), expected.get()))
+    if (isJQueryObj(actual) || isJQueryObj(expected)) {
+        if (!isJQueryObj(actual) || !isJQueryObj(expected) ||
+            getArraysDiff(arrayUtils.toArray(actual), arrayUtils.toArray(expected)))
             return createDiffObject(actual, expected);
         return null;
     }
@@ -279,13 +279,13 @@ function getDescription (obj, doNotWrapStr) {
         return obj.toString();
 
     //arrays
-    if ($.isArray(obj)) {
+    if (arrayUtils.isArray(obj)) {
         return getArrayDescription(obj);
     }
 
     //jQuery objects
-    if (serviceUtils.isJQueryObj(obj))
-        return getArrayDescription($.makeArray(obj));
+    if (isJQueryObj(obj))
+        return getArrayDescription(arrayUtils.toArray(obj));
 
     if (obj === null)
         return 'null';
@@ -326,7 +326,7 @@ AssertionsAPI.prototype._fail = function (err) {
 AssertionsAPI.prototype.ok = function (actual, message) {
     if (!actual) {
         this._fail({
-            code:    ERRORS.API_OK_ASSERTION_FAILED,
+            type:    ERROR_TYPE.okAssertion,
             message: message,
             actual:  getDescription(actual)
         });
@@ -336,7 +336,7 @@ AssertionsAPI.prototype.ok = function (actual, message) {
 AssertionsAPI.prototype.notOk = function (actual, message) {
     if (actual) {
         this._fail({
-            code:    ERRORS.API_NOT_OK_ASSERTION_FAILED,
+            type:    ERROR_TYPE.notOkAssertion,
             message: message,
             actual:  getDescription(actual)
         });
@@ -348,7 +348,7 @@ AssertionsAPI.prototype.eq = function (actual, expected, message) {
 
     if (diff) {
         this._fail({
-            code:      ERRORS.API_EQUAL_ASSERTION_FAILED,
+            type:      ERROR_TYPE.eqAssertion,
             message:   message,
             actual:    diff.actual,
             expected:  diff.expected,
@@ -367,7 +367,7 @@ AssertionsAPI.prototype.notEq = function (actual, unexpected, message, callback)
 
     if (!diff) {
         this._fail({
-            code:     ERRORS.API_NOT_EQUAL_ASSERTION_FAILED,
+            type:     ERROR_TYPE.notEqAssertion,
             message:  message,
             actual:   getDescription(actual),
             callback: callback
@@ -380,13 +380,13 @@ AssertionsAPI.prototype.notEq = function (actual, unexpected, message, callback)
 AssertionsAPI.assert = function (operator, args, callback, context) {
     function onMessage (e) {
         if (e.message.cmd === CROSS_DOMAIN_MESSAGES.ASSERT_RESPONSE_CMD) {
-            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+            messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
             callback(e.message.err);
         }
     }
 
     if (context) {
-        messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+        messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 
         var msg = {
             cmd:      CROSS_DOMAIN_MESSAGES.ASSERT_REQUEST_CMD,
@@ -410,7 +410,9 @@ AssertionsAPI.assert = function (operator, args, callback, context) {
 };
 
 //NOTE: add sourceIndex wrapper
-sourceIndexTracker.wrapTrackableMethods(AssertionsAPI.prototype, CONST.ASSERTION_FUNC_NAMES);
+sourceIndexTracker.wrapTrackableMethods(AssertionsAPI.prototype, [
+    'ok', 'notOk', 'eq', 'notEq'
+]);
 
 
 export default AssertionsAPI;

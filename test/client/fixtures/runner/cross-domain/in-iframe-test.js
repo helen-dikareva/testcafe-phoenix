@@ -1,5 +1,5 @@
 var hammerhead  = window.getTestCafeModule('hammerhead');
-var HH_SETTINGS = hammerhead.get('./settings').get();
+var hhsettings = hammerhead.get('./settings').get();
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var RunnerBase     = testCafeRunner.get('./runner-base');
@@ -9,7 +9,7 @@ var cursor     = testCafeUI.get('./cursor');
 
 cursor.init();
 
-HH_SETTINGS.SERVICE_MSG_URL         = '/ping/10';
+hhsettings.serviceMsgUrl = '/ping/10';
 
 asyncTest('run steps in iframe', function () {
     var $iframe = $('<iframe>');
@@ -64,7 +64,7 @@ asyncTest('run steps in iframe', function () {
         }
     };
 
-    testRunner._onError = function () {
+    testRunner._onFatalError = function () {
         errorRaised = true;
     };
 
@@ -79,7 +79,10 @@ asyncTest('run steps in iframe', function () {
             clickRaised = true;
     };
 
-    testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
+
+    $iframe.load(function () {
+        testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
+    });
 });
 
 asyncTest('element error', function () {
@@ -101,13 +104,13 @@ asyncTest('element error', function () {
             }
         ];
 
-    testRunner._onError = function () {
+    testRunner._onFatalError = function () {
         errorRaised = true;
     };
 
-    testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
-
     $iframe.load(function () {
+        testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
+
         window.setTimeout(function () {
             ok(errorRaised);
 
@@ -144,12 +147,11 @@ asyncTest('failed assertion', function () {
             e.callback();
     };
 
-    testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
-
     testRunner.stepIterator.runNext = function () {
     };
 
-    var storedIFrameStepExecuted     = testRunner._onIFrameStepExecuted;
+    var storedIFrameStepExecuted = testRunner._onIFrameStepExecuted;
+
     testRunner._onIFrameStepExecuted = function () {
         storedIFrameStepExecuted.call(testRunner);
         ok(assertionFailed);
@@ -158,6 +160,10 @@ asyncTest('failed assertion', function () {
 
         start();
     };
+
+    $iframe.load(function () {
+        testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
+    });
 });
 
 asyncTest('shared data', function () {
@@ -200,7 +206,7 @@ asyncTest('shared data', function () {
         assertionFailed = true;
     };
 
-    testRunner._onErrorRaised = function () {
+    testRunner._onFatalError = function () {
         errorRaised = true;
     };
 
@@ -288,8 +294,6 @@ asyncTest('xhrBarrier', function () {
         assertionFailed = true;
     };
 
-    testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
-
     testRunner.stepIterator.runNext = function () {
     };
 
@@ -309,6 +313,10 @@ asyncTest('xhrBarrier', function () {
             start();
         }
     };
+
+    $iframe.load(function () {
+        testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
+    });
 });
 
 asyncTest('waiting for postback', function () {
@@ -345,16 +353,15 @@ asyncTest('waiting for postback', function () {
         assertionFailed = true;
     };
 
-    testRunner._onError = function () {
+    testRunner._onFatalError = function () {
         errorRaised = true;
     };
-
-    testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
 
     testRunner.stepIterator.runNext = function () {
     };
 
-    var storedIFrameStepExecuted     = testRunner._onIFrameStepExecuted;
+    var storedIFrameStepExecuted = testRunner._onIFrameStepExecuted;
+
     testRunner._onIFrameStepExecuted = function () {
         storedIFrameStepExecuted.call(testRunner);
         count++;
@@ -371,4 +378,11 @@ asyncTest('waiting for postback', function () {
             start();
         }
     };
+
+    function onFirstIframeLoad () {
+        $iframe.off('load', onFirstIframeLoad);
+        testRunner._runInIFrame($iframe[0], steps[0].stepName, steps[0].step, steps[0].stepNum);
+    }
+
+    $iframe.on('load', onFirstIframeLoad);
 });

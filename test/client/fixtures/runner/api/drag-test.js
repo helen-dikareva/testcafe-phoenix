@@ -1,10 +1,10 @@
-var hammerhead = window.getTestCafeModule('hammerhead');
-var browser    = hammerhead.Util.Browser;
+var hammerhead   = window.getTestCafeModule('hammerhead');
+var browserUtils = hammerhead.utils.browser;
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
 var SETTINGS     = testCafeCore.get('./settings').get();
-var ERRORS       = testCafeCore.get('./errors');
-var position     = testCafeCore.get('./util/position');
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
+var position     = testCafeCore.get('./utils/position');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -22,15 +22,21 @@ var stepIterator = new StepIterator();
 actionsAPI.init(stepIterator);
 
 var correctTestWaitingTime = function (time) {
-    if (browser.isTouchDevice && browser.isMozilla)
+    if (browserUtils.isTouchDevice && browserUtils.isFirefox)
         return time * 2;
 
     return time;
 };
 
 $(document).ready(function () {
-    //NOTE: remove this after fix IE tests in iFrame
+    // NOTE: remove this after fix IE tests in iFrame
     $('body').css('border', '0px');
+
+    // NOTE: prevent auto scrolling
+    if (browserUtils.isSafari && browserUtils.hasTouchEvents) {
+        var $meta = $('<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, shrink-to-fit=no">');
+        $('head').append($meta);
+    }
 
     var actionTargetWaitingCounter = 0,
         actionRunCounter           = 0;
@@ -60,18 +66,18 @@ $(document).ready(function () {
 
     stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
         stepIterator.state.stoppedOnFail = false;
-        currentErrorCode                 = err.code;
+        currentErrorType                 = err.type;
         currentSourceIndex               = err.__sourceIndex;
     });
 
-    var currentErrorCode   = null,
+    var currentErrorType   = null,
         currentSourceIndex = null,
         //constants
         TEST_ELEMENT_CLASS = 'testElement',
 
         //utils
         asyncActionCallback,
-        hasTouchEvents     = browser.hasTouchEvents,
+        hasTouchEvents     = browserUtils.hasTouchEvents,
         getValueFromPx     = function (px) {
             return parseInt(px.replace('px', ''));
         },
@@ -192,7 +198,7 @@ $(document).ready(function () {
     QUnit.testDone(function () {
         $('.' + TEST_ELEMENT_CLASS).remove();
         $('body').height('').width('');
-        currentErrorCode             = null;
+        currentErrorType             = null;
         asyncActionCallback          = null;
         currentSourceIndex           = null;
         SETTINGS.ENABLE_SOURCE_INDEX = false;
@@ -370,7 +376,7 @@ $(document).ready(function () {
         };
         actionsAPI.drag($draggable, 'abc', '@#%^^', '#211');
         window.setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_INCORRECT_DRAGGING_SECOND_ARGUMENT, 'correct error code sended');
+            equal(currentErrorType, ERROR_TYPE.incorrectDraggingSecondArgument, 'correct error type sended');
             equal(currentSourceIndex, 211);
             start();
         }, correctTestWaitingTime(500));
@@ -383,59 +389,69 @@ $(document).ready(function () {
         };
         actionsAPI.drag($draggable, null, '#803');
         window.setTimeout(function () {
-            equal(currentErrorCode, ERRORS.API_INCORRECT_DRAGGING_SECOND_ARGUMENT, 'correct error code sended');
+            equal(currentErrorType, ERROR_TYPE.incorrectDraggingSecondArgument, 'correct error type sended');
             equal(currentSourceIndex, 803);
             start();
         }, correctTestWaitingTime(500));
     });
 
     module('scrolling functional test');
-    asyncTest('scroll down-right', function () {
-        var $draggable = createDraggable(500, 500),
-            $target    = createTarget(600, 1200);
-        $('body').height(1300).width(700);
-        runAsyncTest(
-            function () {
-                window.setTimeout(function () {
-                    actionsAPI.drag($draggable[0], $target[0]);
-                }, 500)
-                //api.drag($draggable[0], $target[0]);
-            },
-            function () {
-                ok(isInTarget($draggable[0], $target[0]), 'element is in the target');
-            },
-            correctTestWaitingTime(4000)
-        );
+    asyncTest('scroll down right', function () {
+        $('body').height(1500).width(1500);
+
+        window.setTimeout(function () {
+            var draggable = createDraggable(100, 100)[0];
+            var target    = createTarget(1200, 1200)[0];
+
+            runAsyncTest(
+                function () {
+                    window.setTimeout(function () {
+                        actionsAPI.drag(draggable, target);
+                    }, 500);
+                },
+                function () {
+                    ok(isInTarget(draggable, target), 'element is in the target');
+                },
+                correctTestWaitingTime(8000)
+            );
+        }, 500);
     });
 
     asyncTest('scroll up', function () {
-        var $draggable = createDraggable(100, 1300),
-            $target    = createTarget(100, 200);
         $('body').height(1400);
-        runAsyncTest(
-            function () {
-                actionsAPI.drag($draggable[0], $target[0]);
-            },
-            function () {
-                ok(isInTarget($draggable[0], $target[0]), 'element is in the target');
-            },
-            correctTestWaitingTime(8000)
-        );
+
+        window.setTimeout(function () {
+            var draggable = createDraggable(100, 1300)[0];
+            var target    = createTarget(100, 200)[0];
+
+            runAsyncTest(
+                function () {
+                    window.setTimeout(function () {
+                        actionsAPI.drag(draggable, target);
+                    }, 500);
+                },
+                function () {
+                    ok(isInTarget(draggable, target), 'element is in the target');
+                },
+                correctTestWaitingTime(8000)
+            );
+        }, 500);
     });
 
     module('other functional tests');
 
     asyncTest('overlapped during dragging', function () {
-        var $draggable = createDraggable(100, 100),
-            $target    = createTarget(500, 500);
-        createTarget(300, 300).css('zIndex', '100');
-        $('body').height(700).width(1300);
+        var draggable = createDraggable(100, 100)[0],
+            target    = createTarget(100, 500)[0];
+
+        createTarget(100, 300).css('zIndex', '100');
+
         runAsyncTest(
             function () {
-                actionsAPI.drag($draggable, $target);
+                actionsAPI.drag(draggable, target);
             },
             function () {
-                ok(isInTarget($draggable[0], $target[0]), 'element is in the target');
+                ok(isInTarget(draggable, target), 'element is in the target');
             },
             correctTestWaitingTime(3000)
         );

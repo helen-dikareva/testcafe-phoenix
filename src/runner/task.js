@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import BrowserJob from './browser-job';
-import { remove } from '../utils/array';
+import Screenshots from './screenshots';
+import remove from '../utils/array-remove';
 
 
 export default class Task extends EventEmitter {
@@ -10,8 +11,9 @@ export default class Task extends EventEmitter {
         this.running            = false;
         this.browserConnections = browserConnections;
         this.tests              = tests;
+        this.screenshots        = new Screenshots(opts.screenshotPath);
 
-        this.pendingBrowserJobs = this._createBrowserJobs(tests, proxy, opts);
+        this.pendingBrowserJobs = this._createBrowserJobs(tests, proxy, this.screenshots, opts);
     }
 
     _assignBrowserJobEventHandlers (job) {
@@ -34,9 +36,9 @@ export default class Task extends EventEmitter {
         });
     }
 
-    _createBrowserJobs (tests, proxy, opts) {
+    _createBrowserJobs (tests, proxy, screenshots, opts) {
         return this.browserConnections.map(bc => {
-            var job = new BrowserJob(tests, bc, proxy, opts);
+            var job = new BrowserJob(tests, bc, proxy, screenshots, opts);
 
             this._assignBrowserJobEventHandlers(job);
             bc.addJob(job);

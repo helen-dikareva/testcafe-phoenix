@@ -1,10 +1,9 @@
-import * as hammerheadAPI from '../../deps/hammerhead';
+import hammerhead from '../../deps/hammerhead';
 import testCafeCore from '../../deps/testcafe-core';
 
-var browserUtils   = hammerheadAPI.Util.Browser;
-var eventSimulator = hammerheadAPI.EventSandbox.EventSimulator;
+var browserUtils   = hammerhead.utils.browser;
+var eventSimulator = hammerhead.eventSandbox.eventSimulator;
 
-var $               = testCafeCore.$;
 var domUtils        = testCafeCore.domUtils;
 var contentEditable = testCafeCore.contentEditable;
 var textSelection   = testCafeCore.textSelection;
@@ -125,11 +124,13 @@ export default function (element, characters, caretPos) {
         endSelection     = textSelection.getSelectionEnd(element),
 
         //NOTE: attribute 'maxlength' doesn't work in all browsers. In IE still don't support input with type 'number'
-        isNumberInput    = $(element).is('input[type=number]'),
+        isNumberInput    = element.tagName.toLowerCase() === 'input' && element.type === 'number',
         elementMaxLength = !browserUtils.isIE && isNumberInput ?
-                           null : parseInt($(element).attr('maxLength')),
-
+                           null : parseInt(element.maxLength),
         value            = element.value;
+
+    if (elementMaxLength < 0)
+        elementMaxLength = browserUtils.isIE ? 0 : null;
 
     if (elementMaxLength === null || isNaN(elementMaxLength) || elementMaxLength > value.length) {
         if (isNumberInput) {
@@ -137,7 +138,7 @@ export default function (element, characters, caretPos) {
                 startSelection += 1;
                 endSelection += 1;
             }
-            else if (domUtils.isInputWithoutSelectionPropertiesInMozilla(element)) //T133144
+            else if (domUtils.isInputWithoutSelectionPropertiesInFirefox(element)) //T133144
                 startSelection = endSelection = caretPos;
         }
 

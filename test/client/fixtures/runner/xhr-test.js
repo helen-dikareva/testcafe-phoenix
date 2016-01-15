@@ -1,10 +1,8 @@
 var hammerhead  = window.getTestCafeModule('hammerhead');
-var urlUtil     = hammerhead.get('../utils/url');
-var HH_CONST    = hammerhead.get('../const');
-var HH_SETTINGS = hammerhead.get('./settings').get();
+var hhsettings = hammerhead.get('./settings').get();
 
 var testCafeCore = window.getTestCafeModule('testCafeCore');
-var ERRORS       = testCafeCore.get('./errors');
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var xhrBarrier     = testCafeRunner.get('./action-barrier/xhr');
@@ -21,7 +19,7 @@ $(document).ready(function () {
         xhrBarrier.init();
 
         for (var i = 0; i < reqCount; i++) {
-            $.get('/xhr-test/500', function () {
+            $.get('/xhr-test/200', function () {
                 completeReqCount++;
             });
         }
@@ -65,14 +63,14 @@ $(document).ready(function () {
         xhrBarrier.startBarrier(function () {
             ok(!TestCafeClientReqComplete);
             jqxhr.abort();
-            HH_SETTINGS.SERVICE_MSG_URL = null;
+            hhsettings.serviceMsgUrl = null;
             start();
         });
 
-        HH_SETTINGS.SERVICE_MSG_URL = '/xhr-test/8000';
+        hhsettings.serviceMsgUrl = '/xhr-test/8000';
 
         var action = function (callback) {
-            jqxhr = $.ajax(HH_SETTINGS.SERVICE_MSG_URL);
+            jqxhr = $.ajax(hhsettings.serviceMsgUrl);
 
             jqxhr.always(function () {
                 TestCafeClientReqComplete = true;
@@ -90,19 +88,21 @@ $(document).ready(function () {
 
         expect(1);
 
-        var savedTimeout = xhrBarrier.BARRIER_TIMEOUT;
+        var savedTimeout     = xhrBarrier.BARRIER_TIMEOUT;
+        var errorEventRaised = false;
 
         xhrBarrier.setBarrierTimeout(0);
         xhrBarrier.init();
 
         var handler = function (err) {
-            strictEqual(err.code, ERRORS.XHR_REQUEST_TIMEOUT);
+            errorEventRaised = true;
             xhrBarrier.events.off(xhrBarrier.XHR_BARRIER_ERROR, handler);
         };
 
         xhrBarrier.events.on(xhrBarrier.XHR_BARRIER_ERROR, handler);
         xhrBarrier.startBarrier(function () {
             xhrBarrier.setBarrierTimeout(savedTimeout);
+            ok(errorEventRaised);
             start();
         });
 
@@ -112,101 +112,6 @@ $(document).ready(function () {
             jqxhr.abort();
         }, 500);
         xhrBarrier.waitBarrier();
-    });
-
-    asyncTest('Redirect requests to proxy', function () {
-        expect(3);
-
-        xhrBarrier.init();
-
-        xhrBarrier.startBarrier(function () {
-            start();
-        });
-
-        var action = function (callback) {
-            $.get('/xhr-test/100', function (url) {
-                strictEqual(url, '/ownerToken!jobUid/https://example.com/xhr-test/100');
-            });
-
-            $.get('http://' + window.location.host + '/xhr-test/200', function (url) {
-                strictEqual(url, '/ownerToken!jobUid/https://example.com/xhr-test/200');
-            });
-
-            $.get('https://example.com/xhr-test/300', function (url) {
-                strictEqual(url, '/ownerToken!jobUid/https://example.com/xhr-test/300');
-            });
-            callback();
-        };
-
-        action(function () {
-            xhrBarrier.waitBarrier();
-        });
-    });
-
-    asyncTest('Unsupported protocol', function () {
-        var jqxhr = null;
-
-        expect(1);
-
-        xhrBarrier.init();
-
-        var handler = function (err) {
-            strictEqual(err.code, urlUtil.URL_UTIL_PROTOCOL_IS_NOT_SUPPORTED);
-            xhrBarrier.events.off(xhrBarrier.XHR_BARRIER_ERROR, handler);
-            start();
-        };
-
-        xhrBarrier.events.on(xhrBarrier.XHR_BARRIER_ERROR, handler);
-
-        $.get('gopher:test.domain');
-    });
-
-    asyncTest('TC request in not processed by page processor', function () {
-        var ready = function () {
-            if (this.readyState === this.DONE)
-                ok(this.responseText.indexOf(HH_CONST.DOM_SANDBOX_STORED_ATTR_POSTFIX) === -1);
-        };
-
-        expect(1);
-
-        xhrBarrier.init();
-
-        xhrBarrier.startBarrier(function () {
-            HH_SETTINGS.SERVICE_MSG_URL = null;
-            start();
-        });
-
-        HH_SETTINGS.SERVICE_MSG_URL = '/wrap-responseText-test/json';
-
-        var xhr = new XMLHttpRequest();
-
-        xhr.onreadystatechange = ready;
-        xhr.open('GET', HH_SETTINGS.SERVICE_MSG_URL, false);
-        xhr.send(null);
-
-        xhrBarrier.waitBarrier();
-    });
-
-    asyncTest('B238528 - Unexpected text modifying during typing text in the search input on the http://www.google.co.uk', function () {
-        var timeout = 100;
-
-        xhrBarrier.init();
-
-        var ready = function () {
-            if (this.readyState === this.DONE) {
-                ok(syncActionExecuted);
-                start();
-            }
-        };
-
-        var syncActionExecuted = false,
-            xhr                = new XMLHttpRequest();
-
-        xhr.onreadystatechange = ready;
-        xhr.open('GET', '/xhr-test/' + timeout);
-        xhr.send(null);
-
-        syncActionExecuted = true;
     });
 
     asyncTest('T135542 - act.wait method works too-o-o-o long', function () {
@@ -235,4 +140,32 @@ $(document).ready(function () {
             });
         }, 100);
     });
+
+    asyncTest('T233907 - TestRunning waits cancelled xhrs', function () {
+        var timeout = 300;  //NOTE: equals to INITIAL_REQUESTS_COLLECTION_DELAY
+        var barrierCompleted = false;
+
+        expect(1);
+
+        xhrBarrier.init();
+
+        xhrBarrier.startBarrier(function () {
+            barrierCompleted = true;
+        });
+
+        xhrBarrier.waitBarrier();
+
+        var syncActionExecuted = false,
+            xhr = new XMLHttpRequest();
+
+        xhr.open('GET', '/xhr-test/' + 2*timeout);
+        xhr.send(null);
+        xhr.abort();
+
+        setTimeout(function (){
+            ok(barrierCompleted);
+            start();
+        }, timeout);
+    });
+
 });

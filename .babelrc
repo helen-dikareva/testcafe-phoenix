@@ -1,4 +1,5 @@
 {
+  "compact" : false,
   "whitelist": [
     "es6.arrowFunctions",
     "es6.classes",
@@ -14,8 +15,7 @@
     "regenerator",
     "runtime",
     "strict",
-    "es7.asyncFunctions",
-    "es7.classProperties"
+    "es7.asyncFunctions"
   ],
   "loose": [
     "es6.arrowFunctions",

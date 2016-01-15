@@ -1,6 +1,6 @@
 var testCafeCore = window.getTestCafeModule('testCafeCore');
 var SETTINGS     = testCafeCore.get('./settings').get();
-var ERRORS       = testCafeCore.get('./errors');
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -25,11 +25,10 @@ StepIterator.prototype.onActionRun = function () {
     actionRunCounter++;
 };
 
-var stepIterator = new StepIterator();
-actionsAPI.init(stepIterator);
+var stepIterator = null;
 
 $(document).ready(function () {
-        var currentErrorCode   = null,
+        var currentErrorType   = null,
             currentSourceIndex = null,
             asyncActionCallback,
 
@@ -58,27 +57,27 @@ $(document).ready(function () {
         QUnit.testStart(function () {
             actionTargetWaitingCounter = 0;
             actionRunCounter           = 0;
+
+            stepIterator = new StepIterator();
+
+            actionsAPI.init(stepIterator);
+
+            stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
+                stepIterator.state.stoppedOnFail = false;
+                currentErrorType                 = err.type;
+                currentSourceIndex               = err.__sourceIndex;
+            });
+
+            stepIterator.asyncAction = function (action) {
+                action(asyncActionCallback);
+            };
         });
 
         QUnit.testDone(function () {
-            currentErrorCode   = null;
+            currentErrorType   = null;
             currentSourceIndex = null;
 
             SETTINGS.ENABLE_SOURCE_INDEX = false;
-        });
-
-        StepIterator.prototype.asyncAction = function (action) {
-            action(asyncActionCallback);
-        };
-
-        StepIterator.prototype.expectInactivity = function (duration, callback) {
-            callback();
-        };
-
-        stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
-            stepIterator.state.stoppedOnFail = false;
-            currentErrorCode                 = err.code;
-            currentSourceIndex               = err.__sourceIndex;
         });
 
         asyncTest('wait event', function () {
@@ -99,7 +98,7 @@ $(document).ready(function () {
                 },
                 function () {
                     ok(requestComplete, 'action don\'t accomplished waiting for event');
-                    ok(!currentErrorCode, 'action raised error');
+                    ok(!currentErrorType, 'action raised error');
                     equal(actionTargetWaitingCounter, 1);
                     equal(actionRunCounter, 1);
                 },
@@ -109,10 +108,15 @@ $(document).ready(function () {
 
         asyncTest('event timeout', function () {
             SETTINGS.ENABLE_SOURCE_INDEX = true;
-            actionsAPI.waitFor($.get('/xhr-test/300').complete, 20, '#508');
+
+            function delay300s (callback) {
+                window.setTimeout(callback, 300);
+            }
+
+            actionsAPI.waitFor(delay300s, 20, '#508');
 
             window.setTimeout(function () {
-                strictEqual(currentErrorCode, ERRORS.API_WAIT_FOR_ACTION_TIMEOUT_EXCEEDED);
+                strictEqual(currentErrorType, ERROR_TYPE.waitForActionTimeoutExceeded);
                 strictEqual(currentSourceIndex, 508);
                 equal(actionTargetWaitingCounter, 1);
                 equal(actionRunCounter, 0);
@@ -131,7 +135,7 @@ $(document).ready(function () {
             actionsAPI.waitFor(123, 20, '#808');
 
             window.setTimeout(function () {
-                strictEqual(currentErrorCode, ERRORS.API_INCORRECT_WAIT_FOR_ACTION_EVENT_ARGUMENT);
+                strictEqual(currentErrorType, ERROR_TYPE.incorrectWaitForActionEventArgument);
                 strictEqual(currentSourceIndex, 808);
                 start();
             });
@@ -148,7 +152,7 @@ $(document).ready(function () {
             }, 'test', '#313');
 
             window.setTimeout(function () {
-                strictEqual(currentErrorCode, ERRORS.API_INCORRECT_WAIT_FOR_ACTION_TIMEOUT_ARGUMENT);
+                strictEqual(currentErrorType, ERROR_TYPE.incorrectWaitForActionTimeoutArgument);
                 strictEqual(currentSourceIndex, 313);
                 start();
             });
@@ -162,7 +166,7 @@ $(document).ready(function () {
             var $element = $('<div></div>').attr('id', 'testDivElement');
 
             asyncActionCallback = function () {
-                equal(currentErrorCode, null);
+                equal(currentErrorType, null);
                 $element.remove();
                 equal(actionTargetWaitingCounter, 1);
                 equal(actionRunCounter, 1);
@@ -188,7 +192,7 @@ $(document).ready(function () {
             actionsAPI.waitFor('#testDivElement', 250, '#102');
 
             window.setTimeout(function () {
-                strictEqual(currentErrorCode, ERRORS.API_WAIT_FOR_ACTION_TIMEOUT_EXCEEDED);
+                strictEqual(currentErrorType, ERROR_TYPE.waitForActionTimeoutExceeded);
                 strictEqual(currentSourceIndex, 102);
                 equal(asyncActionCallbackRaised, false);
                 equal(actionTargetWaitingCounter, 1);
@@ -206,7 +210,7 @@ $(document).ready(function () {
                 $element2 = $('<div></div>').attr('id', 'testDivElement2');
 
             asyncActionCallback = function () {
-                equal(currentErrorCode, null);
+                equal(currentErrorType, null);
                 $element1.remove();
                 $element2.remove();
                 equal(actionTargetWaitingCounter, 1);
@@ -239,7 +243,7 @@ $(document).ready(function () {
             actionsAPI.waitFor(['#testDivElement1', '#testDivElement2'], 150, '#104');
 
             window.setTimeout(function () {
-                strictEqual(currentErrorCode, ERRORS.API_WAIT_FOR_ACTION_TIMEOUT_EXCEEDED);
+                strictEqual(currentErrorType, ERROR_TYPE.waitForActionTimeoutExceeded);
                 strictEqual(currentSourceIndex, 104);
                 equal(asyncActionCallbackRaised, false);
                 equal(actionTargetWaitingCounter, 1);
@@ -260,7 +264,7 @@ $(document).ready(function () {
             actionsAPI.waitFor([], '#105');
 
             window.setTimeout(function () {
-                strictEqual(currentErrorCode, ERRORS.API_INCORRECT_WAIT_FOR_ACTION_EVENT_ARGUMENT);
+                strictEqual(currentErrorType, ERROR_TYPE.incorrectWaitForActionEventArgument);
                 strictEqual(currentSourceIndex, 105);
                 start();
             });

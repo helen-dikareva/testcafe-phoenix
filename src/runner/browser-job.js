@@ -7,7 +7,7 @@ const QUARANTINE_THRESHOLD = 3;
 
 // Browser job
 export default class BrowserJob extends EventEmitter {
-    constructor (tests, browserConnection, proxy, opts) {
+    constructor (tests, browserConnection, proxy, screenshots, opts) {
         super();
 
         this.started    = false;
@@ -16,6 +16,7 @@ export default class BrowserJob extends EventEmitter {
         this.opts              = opts;
         this.proxy             = proxy;
         this.browserConnection = browserConnection;
+        this.screenshots       = screenshots;
 
         this.testRunQueue = tests.map(test => this._createTestRun(test));
     }
@@ -46,7 +47,7 @@ export default class BrowserJob extends EventEmitter {
     }
 
     _keepInQuarantine (testRun) {
-        var nextAttempt = this._createTestRun(testRun.test, this.browserConnection);
+        var nextAttempt = this._createTestRun(testRun.test);
 
         this.testRunQueue.splice(0, 0, nextAttempt);
     }
@@ -81,11 +82,13 @@ export default class BrowserJob extends EventEmitter {
     }
 
     _createTestRun (test) {
-        var testRun = new TestRun(test, this.browserConnection, this.opts);
-        var done    = this.opts.quarantineMode ?
-                      () => this._testRunDoneInQuarantineMode(testRun) :
-                      () => this._testRunDone(testRun);
+        var screenshotCapturer = this.screenshots.createCapturerFor(test, this.browserConnection.userAgent);
+        var testRun            = new TestRun(test, this.browserConnection, screenshotCapturer, this.opts);
+        var done               = this.opts.quarantineMode ?
+                                 () => this._testRunDoneInQuarantineMode(testRun) :
+                                 () => this._testRunDone(testRun);
 
+        testRun.once('start', () => this.emit('test-run-start', testRun));
         testRun.once('done', done);
 
         return testRun;
@@ -106,7 +109,7 @@ export default class BrowserJob extends EventEmitter {
         }
 
         if (testRun)
-            return this.proxy.openSession(testRun.fixture.page, testRun);
+            return this.proxy.openSession(testRun.test.fixture.page, testRun);
 
         return null;
     }

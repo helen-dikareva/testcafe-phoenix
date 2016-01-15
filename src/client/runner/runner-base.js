@@ -1,4 +1,4 @@
-import * as hammerheadAPI from './deps/hammerhead';
+import hammerhead from './deps/hammerhead';
 import testCafeCore from './deps/testcafe-core';
 import testCafeUI from './deps/testcafe-ui';
 import StepIterator from './step-iterator.js';
@@ -10,21 +10,18 @@ import * as automationIFrameBehavior from './automation/iframe-behavior';
 import * as actionBarrier from './action-barrier/action-barrier';
 
 
-var messageSandbox    = hammerheadAPI.MessageSandbox;
-var hhBind            = hammerheadAPI.on;
-var UNCAUGHT_JS_ERROR = hammerheadAPI.UNCAUGHT_JS_ERROR;
+var messageSandbox = hammerhead.eventSandbox.message;
 
 var SETTINGS                 = testCafeCore.SETTINGS;
-var $                        = testCafeCore.$;
-var SERVICE_COMMANDS         = testCafeCore.SERVICE_COMMANDS;
-var ERRORS                   = testCafeCore.ERRORS;
+var COMMAND                  = testCafeCore.COMMAND;
+var ERROR_TYPE               = testCafeCore.ERROR_TYPE;
 var CROSS_DOMAIN_MESSAGES    = testCafeCore.CROSS_DOMAIN_MESSAGES;
 var jQuerySelectorExtensions = testCafeCore.jQuerySelectorExtensions;
 var transport                = testCafeCore.transport;
 var serviceUtils             = testCafeCore.serviceUtils;
 var domUtils                 = testCafeCore.domUtils;
+var eventUtils               = testCafeCore.eventUtils;
 
-var cursor          = testCafeUI.cursor;
 var modalBackground = testCafeUI.modalBackground;
 
 
@@ -44,12 +41,14 @@ function waitPageLoad (callback) {
             }
         };
 
-    $(window).load(callbackWrapper);
-    $(document).ready(function () {
-        //NOTE: an iFrame may be removed in this moment
-        if (window && window.top)
-            window.setTimeout(callbackWrapper, PAGE_LOAD_TIMEOUT);
-    });
+    eventUtils.bind(window, 'load', callbackWrapper);
+    eventUtils
+        .documentReady()
+        .then(() => {
+            //NOTE: an iFrame may be removed in this moment
+            if (domUtils.isIFrameWindowInDOM(window) || domUtils.isTopWindow(window))
+                window.setTimeout(callbackWrapper, PAGE_LOAD_TIMEOUT);
+        });
 }
 
 //Init
@@ -57,7 +56,7 @@ var RunnerBase = function () {
     var runner = this;
 
     this.eventEmitter = new serviceUtils.EventEmitter();
-    this.stepIterator = new StepIterator(pingIFrame);
+    this.stepIterator = new StepIterator(pingIframe);
 
     this.executingStepInIFrameWindow = null;
     this.stopped                     = false;
@@ -78,27 +77,28 @@ var RunnerBase = function () {
     this._initApi();
     this._initIFrameBehavior();
 
-    hhBind(UNCAUGHT_JS_ERROR, function (err) {
+    hammerhead.on(hammerhead.EVENTS.uncaughtJsError, function (err) {
         //NOTE: in this case we should to stop test iterator in iFrame
         if (err.inIFrame && !SETTINGS.get().PLAYBACK)
             runner.stepIterator.stop();
-        else if (SETTINGS.get().FAIL_ON_JS_ERRORS || SETTINGS.get().RECORDING) {
-            runner._onError({
-                code:      ERRORS.UNCAUGHT_JS_ERROR,
+        else if (!SETTINGS.get().SKIP_JS_ERRORS || SETTINGS.get().RECORDING) {
+            runner._onFatalError({
+                type:      ERROR_TYPE.uncaughtJSError,
                 scriptErr: err.msg,
                 pageError: true,
-                pageUrl:   err.pageUrl
+                pageUrl:   err.pageUrl,
+                stepName:  runner.stepIterator.getCurrentStep()
             });
         }
     });
 
     runner.stepIterator.on(StepIterator.ERROR_EVENT, function (e) {
-        runner._onError(e);
+        runner._onFatalError(e);
     });
 
     runner.act._onJSError = function (err) {
-        runner._onError({
-            code:      ERRORS.UNCAUGHT_JS_ERROR,
+        runner._onFatalError({
+            type:      ERROR_TYPE.uncaughtJSError,
             scriptErr: (err && err.message) || err
         });
     };
@@ -107,6 +107,9 @@ var RunnerBase = function () {
         //NOTE: start test execution only when all content is loaded or if loading
         //timeout is reached (whichever comes first).
         runner._prepareStepsExecuting(function () {
+            if (runner.stopped)
+                return;
+
             delete runner.act._onJSError;
             delete runner.act._start;
 
@@ -129,8 +132,8 @@ var RunnerBase = function () {
                 runner._onActionTargetWaitingStarted(e);
             });
 
-            runner.stepIterator.on(StepIterator.ACTION_RUN_EVENT, function (e) {
-                runner._onActionRun(e);
+            runner.stepIterator.on(StepIterator.ACTION_RUN_EVENT, function () {
+                runner._onActionRun();
             });
 
             runner.stepIterator.on(StepIterator.ASSERTION_FAILED_EVENT, function (e) {
@@ -143,9 +146,6 @@ var RunnerBase = function () {
 
             runner.stepIterator.on(StepIterator.GET_STEPS_SHARED_DATA_EVENT, function (e) {
                 runner._onGetStepsSharedData(e);
-            });
-            runner.stepIterator.on(StepIterator.EXPECT_INACTIVITY_EVENT, function (e) {
-                runner._onExpectInactivity(e);
             });
 
             runner.stepIterator.on(StepIterator.TAKE_SCREENSHOT_EVENT, function (e) {
@@ -177,8 +177,6 @@ RunnerBase.prototype._destroy = function () {
     dialogsAPI.destroy();
 
     this._destroyIFrameBehavior();
-
-    transport.stopInactivityMonitor();
 };
 
 RunnerBase.prototype._initBarrier = function () {
@@ -196,7 +194,7 @@ RunnerBase.prototype._initIFrameBehavior = function () {
 
         switch (message.cmd) {
             case RunnerBase.IFRAME_STEP_COMPLETED_CMD:
-                if (runner.stepIterator.waitedIFrame === domUtils.getIFrameByWindow(e.source))
+                if (runner.stepIterator.waitedIFrame === domUtils.getIframeByWindow(e.source))
                     runner.stepIterator.iFrameActionCallback();
                 else if (runner.executingStepInIFrameWindow === e.source)
                     runner._onIFrameStepExecuted();
@@ -210,7 +208,7 @@ RunnerBase.prototype._initIFrameBehavior = function () {
                     message.err.stepName = runner.stepIterator.getCurrentStep();
                 }
                 runner._clearIFrameExistenceWatcherInterval();
-                runner._onError(message.err);
+                runner._onFatalError(message.err);
                 break;
 
             case RunnerBase.IFRAME_FAILED_ASSERTION_CMD:
@@ -218,7 +216,7 @@ RunnerBase.prototype._initIFrameBehavior = function () {
                     runner.executingStepInIFrameWindow = null;
 
                 message.err.stepNum = runner.stepIterator.state.step - 1;
-                runner._onAssertionFailed(message.err, true);
+                runner._onAssertionFailed(message.err);
                 break;
 
             case RunnerBase.IFRAME_GET_SHARED_DATA_REQUEST_CMD:
@@ -234,14 +232,6 @@ RunnerBase.prototype._initIFrameBehavior = function () {
                 runner.stepIterator.setSharedData(message.sharedData);
                 break;
 
-            case RunnerBase.IFRAME_EXPECT_INACTIVITY_CMD:
-                runner._onExpectInactivity({
-                    duration: message.duration,
-                    callback: function () {
-                    }
-                });
-                break;
-
             case RunnerBase.IFRAME_NEXT_STEP_STARTED_CMD:
                 runner.executingStepInIFrameWindow = e.source;
                 runner._clearFileDownloadingInterval();
@@ -250,14 +240,16 @@ RunnerBase.prototype._initIFrameBehavior = function () {
 
             case RunnerBase.IFRAME_ACTION_TARGET_WAITING_STARTED_CMD:
                 runner.actionTargetWaitingStarted = true;
+                runner._onActionTargetWaitingStarted(e.message.params);
                 break;
 
             case RunnerBase.IFRAME_ACTION_RUN_CMD:
                 runner.actionTargetWaitingStarted = false;
+                runner._onActionRun();
                 break;
 
             case CROSS_DOMAIN_MESSAGES.IFRAME_TEST_RUNNER_WAITING_STEP_COMPLETION_REQUEST_CMD:
-                if (runner.stepIterator.waitedIFrame === domUtils.getIFrameByWindow(e.source) ||
+                if (runner.stepIterator.waitedIFrame === domUtils.getIframeByWindow(e.source) ||
                     runner.executingStepInIFrameWindow === e.source) {
                     msg = {
                         cmd: CROSS_DOMAIN_MESSAGES.IFRAME_TEST_RUNNER_WAITING_STEP_COMPLETION_RESPONSE_CMD
@@ -269,8 +261,9 @@ RunnerBase.prototype._initIFrameBehavior = function () {
 
             case RunnerBase.IFRAME_TAKE_SCREENSHOT_REQUEST_CMD:
                 runner._onTakeScreenshot({
-                    isFailedStep: message.isFailedStep,
-                    callback:     function () {
+                    stepName: message.stepName,
+                    filePath: message.filePath,
+                    callback: function () {
                         msg = {
                             cmd: RunnerBase.IFRAME_TAKE_SCREENSHOT_RESPONSE_CMD
                         };
@@ -285,6 +278,9 @@ RunnerBase.prototype._initIFrameBehavior = function () {
                 break;
 
             case RunnerBase.IFRAME_BEFORE_UNLOAD_REQUEST_CMD:
+                runner.actionTargetWaitingStarted = false;
+                runner._onActionRun();
+
                 runner._onBeforeUnload(true, function (res) {
                     msg = {
                         cmd: RunnerBase.IFRAME_BEFORE_UNLOAD_RESPONSE_CMD,
@@ -296,38 +292,30 @@ RunnerBase.prototype._initIFrameBehavior = function () {
         }
     }
 
-    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 
     //NOTE: for test purposes
     runner._destroyIFrameBehavior = function () {
         automationIFrameBehavior.destroy();
-        messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+        messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
     };
 };
 
 RunnerBase.prototype._prepareStepsExecuting = function (callback, skipPageWaiting) {
-    function runCallback () {
-        cursor.init();
+    if (skipPageWaiting) {
         callback();
+        return;
     }
 
-    if (skipPageWaiting)
-        runCallback();
-    else {
-        waitPageLoad(function () {
-            window.setTimeout(function () {
-                transport.batchUpdate(function () {
-                    jQuerySelectorExtensions.init();
+    waitPageLoad(() => {
+        window.setTimeout(() => {
+            transport.batchUpdate(() => {
+                jQuerySelectorExtensions.init();
 
-                    actionBarrier.waitPageInitialization(function () {
-                        cursor.init();
-
-                        callback();
-                    });
-                });
-            }, ANIMATIONS_WAIT_DELAY);
-        });
-    }
+                actionBarrier.waitPageInitialization(callback);
+            });
+        }, ANIMATIONS_WAIT_DELAY);
+    });
 };
 
 RunnerBase.WAITING_FOR_ACTION_TARGET_MESSAGE = 'Waiting for the target element of the next action to appear';
@@ -348,7 +336,6 @@ RunnerBase.IFRAME_FAILED_ASSERTION_CMD              = 'iframeFailedAssertion';
 RunnerBase.IFRAME_GET_SHARED_DATA_REQUEST_CMD       = 'getSharedDataRequest';
 RunnerBase.IFRAME_GET_SHARED_DATA_RESPONSE_CMD      = 'getSharedDataResponse';
 RunnerBase.IFRAME_SET_SHARED_DATA_CMD               = 'setSharedData';
-RunnerBase.IFRAME_EXPECT_INACTIVITY_CMD             = 'expectInactivity';
 RunnerBase.IFRAME_NEXT_STEP_STARTED_CMD             = 'nextStepStarted';
 RunnerBase.IFRAME_ACTION_TARGET_WAITING_STARTED_CMD = 'actionTargetWaitingStarted';
 RunnerBase.IFRAME_ACTION_RUN_CMD                    = 'actionRun';
@@ -362,8 +349,10 @@ RunnerBase.prototype.on = function (event, handler) {
     this.eventEmitter.on(event, handler);
 };
 
-function pingIFrame (iframe, callback) {
-    messageSandbox.pingIFrame(iframe, CROSS_DOMAIN_MESSAGES.IFRAME_TEST_RUNNER_PING_DISPATCHER_CMD, callback);
+function pingIframe (iframe, callback) {
+    messageSandbox
+        .pingIframe(iframe, CROSS_DOMAIN_MESSAGES.IFRAME_TEST_RUNNER_PING_DISPATCHER_CMD)
+        .then(callback);
 }
 
 RunnerBase.prototype._runInIFrame = function (iframe, stepName, step, stepNum) {
@@ -387,11 +376,11 @@ RunnerBase.prototype._runInIFrame = function (iframe, stepName, step, stepNum) {
         }
     }
 
-    pingIFrame(iframe, function (err) {
+    pingIframe(iframe, function (err) {
         if (err) {
-            runner._onError({
-                code:     ERRORS.IN_IFRAME_TARGET_LOADING_TIMEOUT,
-                stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
+            runner._onFatalError({
+                type:     ERROR_TYPE.inIFrameTargetLoadingTimeout,
+                stepName: runner.stepIterator.getCurrentStep()
             });
         }
         else {
@@ -403,9 +392,9 @@ RunnerBase.prototype._runInIFrame = function (iframe, stepName, step, stepNum) {
 
 RunnerBase.prototype._ensureIFrame = function (arg) {
     if (!arg) {
-        this._onError({
-            code:     ERRORS.API_EMPTY_IFRAME_ARGUMENT,
-            stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
+        this._onFatalError({
+            type:     ERROR_TYPE.emptyIFrameArgument,
+            stepName: this.stepIterator.getCurrentStep()
         });
         return null;
     }
@@ -414,9 +403,9 @@ RunnerBase.prototype._ensureIFrame = function (arg) {
         if (arg.tagName && arg.tagName.toLowerCase() === 'iframe')
             return arg;
         else {
-            this._onError({
-                code:     ERRORS.API_IFRAME_ARGUMENT_IS_NOT_IFRAME,
-                stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
+            this._onFatalError({
+                type:     ERROR_TYPE.iframeArgumentIsNotIFrame,
+                stepName: this.stepIterator.getCurrentStep()
             });
             return null;
         }
@@ -425,18 +414,18 @@ RunnerBase.prototype._ensureIFrame = function (arg) {
     if (typeof arg === 'string')
         arg = $(arg);
 
-    if (serviceUtils.isJQueryObj(arg)) {
+    if (hammerhead.utils.isJQueryObj(arg)) {
         if (arg.length === 0) {
-            this._onError({
-                code:     ERRORS.API_EMPTY_IFRAME_ARGUMENT,
-                stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
+            this._onFatalError({
+                type:     ERROR_TYPE.emptyIFrameArgument,
+                stepName: this.stepIterator.getCurrentStep()
             });
             return null;
         }
         else if (arg.length > 1) {
-            this._onError({
-                code:     ERRORS.API_MULTIPLE_IFRAME_ARGUMENT,
-                stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
+            this._onFatalError({
+                type:     ERROR_TYPE.multipleIFrameArgument,
+                stepName: this.stepIterator.getCurrentStep()
             });
             return null;
         }
@@ -447,10 +436,11 @@ RunnerBase.prototype._ensureIFrame = function (arg) {
     if (typeof arg === 'function')
         return this._ensureIFrame(arg());
 
-    this._onError({
-        code:     ERRORS.API_INCORRECT_IFRAME_ARGUMENT,
-        stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
+    this._onFatalError({
+        type:     ERROR_TYPE.incorrectIFrameArgument,
+        stepName: this.stepIterator.getCurrentStep()
     });
+
     return null;
 };
 
@@ -482,7 +472,7 @@ RunnerBase.prototype._initApi = function () {
                 iFrame  = runner._ensureIFrame(iFrameGetter());
 
             if (iFrame)
-                runner._runInIFrame(iFrame, SETTINGS.get().CURRENT_TEST_STEP_NAME, step, stepNum);
+                runner._runInIFrame(iFrame, runner.stepIterator.getCurrentStep(), step, stepNum);
         };
     };
 };
@@ -499,7 +489,7 @@ RunnerBase.prototype._initNativeDialogs = function () {
     dialogsAPI.on(dialogsAPI.UNEXPECTED_DIALOG_ERROR_EVENT, function (e) {
         if (runner.listenNativeDialogs) {
             runner.stepIterator.onError({
-                code:     ERRORS.API_UNEXPECTED_DIALOG,
+                type:     ERROR_TYPE.unexpectedDialog,
                 stepName: runner.stepIterator.getCurrentStep(),
                 dialog:   e.dialog,
                 message:  e.message
@@ -510,7 +500,7 @@ RunnerBase.prototype._initNativeDialogs = function () {
     dialogsAPI.on(dialogsAPI.WAS_NOT_EXPECTED_DIALOG_ERROR_EVENT, function (e) {
         if (runner.listenNativeDialogs) {
             runner.stepIterator.onError({
-                code:     ERRORS.API_EXPECTED_DIALOG_DOESNT_APPEAR,
+                type:     ERROR_TYPE.expectedDialogDoesntAppear,
                 stepName: runner.stepIterator.getCurrentStep(),
                 dialog:   e.dialog
             });
@@ -523,6 +513,7 @@ RunnerBase.prototype._initNativeDialogs = function () {
 };
 //Handlers
 RunnerBase.prototype._onTestComplete = function (e) {
+    this.stopped = true;
     this.eventEmitter.emit(this.TEST_COMPLETED_EVENT, {});
     e.callback();
 };
@@ -539,7 +530,7 @@ RunnerBase.prototype._onActionRun = function () {
     this.eventEmitter.emit(this.ACTION_RUN_EVENT, {});
 };
 
-RunnerBase.prototype._onError = function (err) {
+RunnerBase.prototype._onFatalError = function (err) {
     this.eventEmitter.emit(this.TEST_FAILED_EVENT, {
         stepNum: this.stepIterator.state.step - 1,
         err:     err
@@ -554,10 +545,6 @@ RunnerBase.prototype._onSetStepsSharedData = function (e) {
 };
 
 RunnerBase.prototype._onGetStepsSharedData = function (e) {
-    e.callback();
-};
-
-RunnerBase.prototype._onExpectInactivity = function (e) {
     e.callback();
 };
 
@@ -587,12 +574,15 @@ RunnerBase.prototype.setGlobalWaitFor = function (event, timeout) {
 RunnerBase.prototype._onBeforeUnload = function (fromIFrame, callback) {
     var runner = this;
 
+    if (this.stopped)
+        return;
+
     //NOTE: we should expect file downloading request only after before unload event (T216625)
-    transport.asyncServiceMsg({ cmd: SERVICE_COMMANDS.UNCHECK_FILE_DOWNLOADING_FLAG }, function () {
+    transport.asyncServiceMsg({ cmd: COMMAND.uncheckFileDownloadingFlag }, function () {
 
         //NOTE: we need check it to determinate file downloading
         runner.isFileDownloadingIntervalID = window.setInterval(function () {
-            transport.asyncServiceMsg({ cmd: SERVICE_COMMANDS.GET_AND_UNCHECK_FILE_DOWNLOADING_FLAG }, function (res) {
+            transport.asyncServiceMsg({ cmd: COMMAND.getAndUncheckFileDownloadingFlag }, function (res) {
                 if (res) {
                     window.clearInterval(runner.isFileDownloadingIntervalID);
                     runner.isFileDownloadingIntervalID = null;

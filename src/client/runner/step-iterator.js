@@ -1,29 +1,32 @@
-import * as hammerheadAPI from './deps/hammerhead';
+import hammerhead from './deps/hammerhead';
 import testCafeCore from './deps/testcafe-core';
 import * as actionBarrier from './action-barrier/action-barrier';
 import * as xhrBarrier from './action-barrier/xhr';
 import async from './deps/async';
 
-var browserUtils        = hammerheadAPI.Util.Browser;
-var nativeMethods       = hammerheadAPI.NativeMethods;
-var JSON                = hammerheadAPI.JSON;
-var BEFORE_UNLOAD_EVENT = hammerheadAPI.BEFORE_UNLOAD_EVENT;
-var hhBind              = hammerheadAPI.on;
+var browserUtils = hammerhead.utils.browser;
+var JSON         = hammerhead.json;
 
-var $            = testCafeCore.$;
 var SETTINGS     = testCafeCore.SETTINGS;
-var ERRORS       = testCafeCore.ERRORS;
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
 var serviceUtils = testCafeCore.serviceUtils;
 var domUtils     = testCafeCore.domUtils;
+var eventUtils   = testCafeCore.eventUtils;
 
 
 const STEP_DELAY                 = 500;
 const PROLONGED_STEP_DELAY       = 3000;
 const SHORT_PROLONGED_STEP_DELAY = 30;
 
+const SUSPEND_ACTIONS = {
+    runStep:           'runStep',
+    asyncAction:       'asyncAction',
+    asyncActionSeries: 'asyncActionSeries'
+};
+
 
 //Iterator
-var StepIterator = function (pingIFrame) {
+var StepIterator = function (pingIframe) {
     this.state = {
         step:                     0,
         stepNames:                null,
@@ -36,11 +39,14 @@ var StepIterator = function (pingIFrame) {
         stepsSharedData:          {},
         lastSyncedSharedDataJSON: null,
         stopped:                  false,
+        suspended:                false,
+        suspendedAction:          null,
+        suspendedArgs:            [],
         waitedIFrame:             null,
-        needScreeshot:            false
+        curStepErrors:            []
     };
 
-    this.pingIFrame           = pingIFrame;
+    this.pingIframe           = pingIframe;
     this.globalWaitForEvent   = null;
     this.globalWaitForTimeout = null;
 
@@ -56,7 +62,6 @@ StepIterator.ERROR_EVENT                         = 'error';
 StepIterator.ASSERTION_FAILED_EVENT              = 'assertionFailed';
 StepIterator.SET_STEPS_SHARED_DATA_EVENT         = 'setStepsSharedData';
 StepIterator.GET_STEPS_SHARED_DATA_EVENT         = 'getStepsSharedData';
-StepIterator.EXPECT_INACTIVITY_EVENT             = 'expectInactivity';
 StepIterator.TAKE_SCREENSHOT_EVENT               = 'takeScreenshot';
 StepIterator.BEFORE_UNLOAD_EVENT_RAISED          = 'beforeUnload';
 StepIterator.UNLOAD_EVENT_RAISED                 = 'unload';
@@ -70,7 +75,7 @@ StepIterator.prototype._checkSharedDataSerializable = function () {
 
     if (!JSON.isSerializable(this.state.stepsSharedData)) {
         error = {
-            code:     ERRORS.STORE_DOM_NODE_OR_JQUERY_OBJECT,
+            type:     ERROR_TYPE.storeDomNodeOrJqueryObject,
             stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME,
             stepNum:  this.state.step - 1
         };
@@ -84,7 +89,13 @@ StepIterator.prototype._checkSharedDataSerializable = function () {
 };
 
 StepIterator.prototype._runStep = function () {
-    this.state.stopped = false;
+    if (this.state.suspended) {
+        this.state.suspendedAction = SUSPEND_ACTIONS.runStep;
+        return;
+    }
+
+    this.state.stopped       = false;
+    this.state.curStepErrors = [];
 
     var iterator = this;
 
@@ -132,7 +143,7 @@ StepIterator.prototype._runStep = function () {
                     iterator.callWithSharedDataContext(stepToRun);
                 } catch (err) {
                     error = {
-                        code:      ERRORS.UNCAUGHT_JS_ERROR_IN_TEST_CODE_STEP,
+                        type:      ERROR_TYPE.uncaughtJSErrorInTestCodeStep,
                         scriptErr: (err && err.message) || err,
                         stepName:  SETTINGS.get().CURRENT_TEST_STEP_NAME,
                         stepNum:   iterator.state.step - 1
@@ -161,14 +172,7 @@ StepIterator.prototype._runStep = function () {
                     if (!iterator._checkSharedDataSerializable())
                         return;
 
-                    if (SETTINGS.get().TAKE_SCREENSHOT_ON_FAILS && iterator.state.needScreeshot) {
-                        iterator.takeScreenshot(function () {
-                            iterator.state.needScreeshot = false;
-                            runCallback();
-                        }, true);
-                    }
-                    else
-                        runCallback();
+                    runCallback();
                 }
             });
         }
@@ -176,43 +180,49 @@ StepIterator.prototype._runStep = function () {
 };
 
 StepIterator.prototype._setupUnloadPrediction = function () {
-    var iterator     = this,
-        $form        = $('form'),
-        prolong      = function () {
+    var iterator       = this,
+        forms          = document.getElementsByTagName('form'),
+        prolong        = function () {
             iterator.state.prolongStepDelay = true;
         },
-        shortProlong = function () {
+        shortProlong   = function () {
             iterator.state.shortProlongStepDelay = true;
         },
-        beforeUnload = function () {
+        beforeUnload   = function () {
             iterator.state.pageUnloading = true;
 
             iterator.eventEmitter.emit(StepIterator.BEFORE_UNLOAD_EVENT_RAISED);
         },
-        unload       = function () {
+        unload         = function () {
             iterator.state.pageUnloading = true;
 
             iterator.eventEmitter.emit(StepIterator.UNLOAD_EVENT_RAISED);
+        },
+
+        overrideSubmit = function (form) {
+            var submit = form.submit;
+
+            form.submit = function () {
+                prolong();
+                submit.apply(form, arguments);
+            };
         };
 
-    $(document).on('submit', 'form', prolong);
-
-    $form.each(function () {
-        var submit = this.submit;
-
-        this.submit = function () {
+    eventUtils.bind(document, 'submit', function (e) {
+        if (e.target.tagName.toLowerCase() === 'form')
             prolong();
-            submit.apply(this, arguments);
-        };
     });
+
+    for (var i = 0; i < forms.length; i++)
+        overrideSubmit(forms[i]);
 
     var skipBeforeUnloadEvent = false;
 
-    nativeMethods.addEventListener.call(document, 'click', function (e) {
+    eventUtils.bind(document, 'click', function (e) {
         var target = (e.srcElement || e.target);
 
         if (!e.defaultPrevented && target.tagName && target.tagName.toLowerCase() === 'a') {
-            var href = $(target).attr('href');
+            var href = target.href;
 
             if (target.hasAttribute('href') && !/(^javascript:)|(^mailto:)|(^tel:)|(^#)/.test(href))
                 prolong();
@@ -229,18 +239,18 @@ StepIterator.prototype._setupUnloadPrediction = function () {
             //NOTE: except file downloading
             if (document.readyState === 'loading' &&
                 !(document.activeElement && document.activeElement.tagName.toLowerCase() === 'a' &&
-                document.activeElement.getAttribute('download') !== null))
+                document.activeElement.hasAttribute('download')))
                 beforeUnload();
         }, 0);
     }
 
-    hhBind(BEFORE_UNLOAD_EVENT, browserUtils.isIE ? onBeforeUnloadIE : beforeUnload);
+    hammerhead.on(hammerhead.EVENTS.beforeUnload, browserUtils.isIE ? onBeforeUnloadIE : beforeUnload);
 
-    hhBind(BEFORE_UNLOAD_EVENT, function () {
+    hammerhead.on(hammerhead.EVENTS.beforeUnload, function () {
         skipBeforeUnloadEvent = false;
     });
 
-    nativeMethods.windowAddEventListener.call(window, 'unload', unload);
+    eventUtils.bind(window, 'unload', unload);
 };
 
 StepIterator.prototype._syncSharedDataWithServer = function (callback) {
@@ -272,11 +282,6 @@ StepIterator.prototype._syncSharedDataWithServer = function (callback) {
 
 StepIterator.prototype._completeAsyncAction = function () {
     var iterator = this;
-
-    if (typeof iterator.state.stepDone === 'function' && !iterator.state.stepDoneCalled) {
-        iterator.state.stepDone();
-        iterator.state.stepDoneCalled = true;
-    }
 
     if (iterator.state.stopped)
         return;
@@ -312,112 +317,102 @@ StepIterator.prototype._checkIFrame = function (element, callback) {
         return;
     }
 
-    var iFrame = domUtils.getIFrameByElement(element);
+    var iFrame = domUtils.getIframeByElement(element);
 
-    this.pingIFrame(iFrame, function () {
+    this.pingIframe(iFrame, function () {
         callback(iFrame);
     });
 
 };
 
 StepIterator.prototype.asyncAction = function (action) {
+    if (this.state.suspended) {
+        this.state.suspendedAction = SUSPEND_ACTIONS.asyncAction;
+        this.state.suspendedArgs   = arguments;
+        return;
+    }
+
     var iterator = this;
 
     this.state.inAsyncAction = true;
 
-    var actionRun = function () {
-        iterator._syncSharedDataWithServer(function () {
-            actionBarrier.waitActionSideEffectsCompletion(action, function () {
-                iterator._completeAsyncAction.apply(iterator, arguments);
-            });
+    iterator._syncSharedDataWithServer(function () {
+        actionBarrier.waitActionSideEffectsCompletion(action, function () {
+            iterator._completeAsyncAction.apply(iterator, arguments);
         });
-    };
-
-    if (SETTINGS.get().TAKE_SCREENSHOT_ON_FAILS && this.state.needScreeshot) {
-        this.takeScreenshot(function () {
-            iterator.state.needScreeshot = false;
-            actionRun();
-        }, true);
-    }
-    else
-        actionRun();
+    });
 };
 
 StepIterator.prototype.asyncActionSeries = function (items, runArgumentsIterator, action) {
+    if (this.state.suspended) {
+        this.state.suspendedAction = SUSPEND_ACTIONS.asyncActionSeries;
+        this.state.suspendedArgs   = arguments;
+        return;
+    }
+
     var iterator = this;
-
-    var actionsRun = function () {
-        var seriesActionsRun = function (elements, callback) {
-            async.forEachSeries(
-                elements,
-                function (element, asyncCallback) {
-                    //NOTE: since v.14.1.5 it's recommended to run actions with the inIFrame function. But we should support old-style iframes
-                    //using, so, it'll be resolved here.
-                    iterator._checkIFrame(element, function (iframe) {
-                        if (!iframe) {
-                            actionBarrier.waitActionSideEffectsCompletion(function (barrierCallback) {
-                                action(element, barrierCallback);
-                            }, asyncCallback);
-                        }
-                        else {
-                            var iFrameStartXhrBarrier = iframe.contentWindow[xhrBarrier.GLOBAL_START_XHR_BARRIER],
-                                iFrameWaitXhrBarrier  = iframe.contentWindow[xhrBarrier.GLOBAL_WAIT_XHR_BARRIER];
-
-                            actionBarrier.waitActionSideEffectsCompletion(function (barrierCallback) {
-                                var iFrameBeforeUnloadRaised = false;
-
-                                iterator.iFrameActionCallback = function () {
-                                    iterator.iFrameActionCallback = null;
-                                    iterator.waitedIFrame         = null;
-                                    barrierCallback();
-                                };
-
-                                iterator.waitedIFrame = iframe;
-
-                                iFrameStartXhrBarrier(function () {
-                                    if (!iFrameBeforeUnloadRaised)
-                                        iterator.iFrameActionCallback();
-                                });
-
-                                function onBeforeUnload () {
-                                    nativeMethods.windowRemoveEventListener.call(iframe.contentWindow, 'beforeunload', onBeforeUnload);
-                                    iFrameBeforeUnloadRaised = true;
-                                }
-
-                                nativeMethods.windowAddEventListener.call(iframe.contentWindow, 'beforeunload', onBeforeUnload, true);
-
-                                action(element, function () {
-                                    iFrameWaitXhrBarrier();
-                                }, iframe);
-                            }, asyncCallback);
-                        }
-                    });
-                },
-                function () {
-                    if (iterator.state.stopped)
-                        return;
-
-                    callback();
-                });
-        };
-
-        iterator._syncSharedDataWithServer(function () {
-            runArgumentsIterator(items, seriesActionsRun, function () {
-                iterator._completeAsyncAction.apply(iterator, arguments);
-            });
-        });
-    };
 
     iterator.state.inAsyncAction = true;
 
-    if (SETTINGS.get().TAKE_SCREENSHOT_ON_FAILS && this.state.needScreeshot) {
-        this.takeScreenshot(function () {
-            iterator.state.needScreeshot = false;
-            actionsRun();
-        }, true);
-    }
-    else
-        actionsRun();
+    var seriesActionsRun = function (elements, callback) {
+        async.forEachSeries(
+            elements,
+            function (element, asyncCallback) {
+                // NOTE: since v.14.1.5 it's recommended to run actions using the inIFrame function.
+                // But we should support old-style iframes, so it'll be resolved here.
+                iterator._checkIFrame(element, function (iframe) {
+                    if (!iframe) {
+                        actionBarrier.waitActionSideEffectsCompletion(function (barrierCallback) {
+                            action(element, barrierCallback);
+                        }, asyncCallback);
+                    }
+                    else {
+                        var iFrameStartXhrBarrier = iframe.contentWindow[xhrBarrier.GLOBAL_START_XHR_BARRIER],
+                            iFrameWaitXhrBarrier  = iframe.contentWindow[xhrBarrier.GLOBAL_WAIT_XHR_BARRIER];
+
+                        actionBarrier.waitActionSideEffectsCompletion(function (barrierCallback) {
+                            var iFrameBeforeUnloadRaised = false;
+
+                            iterator.iFrameActionCallback = function () {
+                                iterator.iFrameActionCallback = null;
+                                iterator.waitedIFrame         = null;
+                                barrierCallback();
+                            };
+
+                            iterator.waitedIFrame = iframe;
+
+                            iFrameStartXhrBarrier(function () {
+                                if (!iFrameBeforeUnloadRaised)
+                                    iterator.iFrameActionCallback();
+                            });
+
+                            function onBeforeUnload () {
+                                eventUtils.unbind(iframe.contentWindow, 'beforeunload', onBeforeUnload);
+                                iFrameBeforeUnloadRaised = true;
+                            }
+
+                            eventUtils.bind(iframe.contentWindow, 'beforeunload', onBeforeUnload);
+
+                            action(element, function () {
+                                iFrameWaitXhrBarrier();
+                            }, iframe);
+                        }, asyncCallback);
+                    }
+                });
+            },
+            function () {
+                if (iterator.state.stopped)
+                    return;
+
+                callback();
+            });
+    };
+
+    iterator._syncSharedDataWithServer(function () {
+        runArgumentsIterator(items, seriesActionsRun, function () {
+            iterator._completeAsyncAction.apply(iterator, arguments);
+        });
+    });
 };
 
 StepIterator.prototype._init = function () {
@@ -475,7 +470,10 @@ StepIterator.prototype.onError = function (err) {
     if (this.state.stopped)
         return;
 
-    this.eventEmitter.emit(StepIterator.ERROR_EVENT, $.extend({
+    this.state.curStepErrors.push(err);
+
+
+    this.eventEmitter.emit(StepIterator.ERROR_EVENT, hammerhead.utils.extend({
         stepNum: this.state.step - 1
     }, err));
 };
@@ -484,17 +482,12 @@ StepIterator.prototype.onAssertionFailed = function (err) {
     if (this.state.stopped)
         return;
 
+    this.state.curStepErrors.push(err);
+
     this.eventEmitter.emit(StepIterator.ASSERTION_FAILED_EVENT, {
         err:         err,
         stepNum:     this.state.step - 1,
         isAssertion: true
-    });
-};
-
-StepIterator.prototype.expectInactivity = function (duration, callback) {
-    this.eventEmitter.emit(StepIterator.EXPECT_INACTIVITY_EVENT, {
-        duration: duration,
-        callback: callback
     });
 };
 
@@ -523,6 +516,32 @@ StepIterator.prototype.onActionRun = function () {
     this.eventEmitter.emit(StepIterator.ACTION_RUN_EVENT, {});
 };
 
+StepIterator.prototype.suspend = function () {
+    // NOTE: in fact we can suspend the iterator before
+    // the next step or an async action run
+    this.state.suspended = true;
+};
+
+StepIterator.prototype.resume = function () {
+    if (!this.state.suspended || this.state.stopped)
+        return;
+
+    this.state.suspended = false;
+
+    if (this.state.suspendedAction === SUSPEND_ACTIONS.runStep)
+        this._runStep();
+
+    if (this.state.suspendedAction === SUSPEND_ACTIONS.asyncAction)
+        this.asyncAction.apply(this, this.state.suspendedArgs);
+
+    if (this.state.suspendedAction === SUSPEND_ACTIONS.asyncActionSeries)
+        this.asyncActionSeries.apply(this, this.state.suspendedArgs);
+
+    this.state.suspendedAction = null;
+    this.state.suspendedArgs   = [];
+};
+
+
 //Global __waitFor()
 StepIterator.prototype.setGlobalWaitFor = function (event, timeout) {
     this.globalWaitForEvent   = event;
@@ -542,26 +561,24 @@ StepIterator.prototype.__waitFor = function (callback) {
 
     var timeoutID = window.setTimeout(function () {
         iterator.onError({
-            code:     ERRORS.API_WAIT_FOR_ACTION_TIMEOUT_EXCEEDED,
+            type:     ERROR_TYPE.waitForActionTimeoutExceeded,
             stepName: SETTINGS.get().CURRENT_TEST_STEP_NAME
         });
     }, this.globalWaitForTimeout);
 
-
-    this.expectInactivity(this.globalWaitForTimeout, function () {
-        iterator.callWithSharedDataContext(function () {
-            iterator.globalWaitForEvent.call(this, function () {
-                window.clearTimeout(timeoutID);
-                callback();
-            });
+    iterator.callWithSharedDataContext(function () {
+        iterator.globalWaitForEvent.call(this, function () {
+            window.clearTimeout(timeoutID);
+            callback();
         });
     });
 };
 
-StepIterator.prototype.takeScreenshot = function (callback, isFailedStep) {
+StepIterator.prototype.takeScreenshot = function (callback, filePath) {
     this.eventEmitter.emit(StepIterator.TAKE_SCREENSHOT_EVENT, {
-        isFailedStep: isFailedStep,
-        callback:     callback
+        stepName: this.getCurrentStep(),
+        filePath: filePath || '',
+        callback: callback
     });
 };
 

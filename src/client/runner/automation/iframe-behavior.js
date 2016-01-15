@@ -1,17 +1,16 @@
-import * as hammerheadAPI from '../deps/hammerhead';
+import hammerhead from '../deps/hammerhead';
 import testCafeCore from '../deps/testcafe-core';
 import testCafeUI from '../deps/testcafe-ui';
 import movePlaybackAutomation from './playback/move';
-import * as scrollAutomation from './scroll-behavior';
 
-var messageSandbox = hammerheadAPI.MessageSandbox;
+var messageSandbox = hammerhead.eventSandbox.message;
 
 var SETTINGS              = testCafeCore.SETTINGS;
 var CROSS_DOMAIN_MESSAGES = testCafeCore.CROSS_DOMAIN_MESSAGES;
 var domUtils              = testCafeCore.domUtils;
 var positionUtils         = testCafeCore.positionUtils;
 
-var cursor = testCafeUI.cursor;
+var cursor = testCafeUI.cursorOld;
 
 
 function onMessage (e) {
@@ -115,18 +114,18 @@ function onMessage (e) {
 
             break;
 
-        case CROSS_DOMAIN_MESSAGES.SCROLL_TOP_WINDOW_REQUEST_CMD:
-            scrollAutomation.setScroll(e.source, message.point, message.options, function () {
-                messageSandbox.sendServiceMsg({ cmd: CROSS_DOMAIN_MESSAGES.SCROLL_TOP_WINDOW_RESPONSE_CMD }, e.source);
-            });
-            break;
-
         case CROSS_DOMAIN_MESSAGES.GET_IFRAME_POSITION_DATA_REQUEST_CMD:
-            var data = scrollAutomation.getScrollData(e.source);
+            var iFrame = domUtils.getIframeByWindow(e.source);
 
-            data.cmd = CROSS_DOMAIN_MESSAGES.GET_IFRAME_POSITION_DATA_RESPONSE_CMD;
+            var msg = {
+                scroll:        styleUtils.getElementScroll(domUtils.findDocument(document)),
+                iFrameOffset:  positionUtils.getOffsetPosition(iFrame),
+                iFrameBorders: styleUtils.getBordersWidth(iFrame),
+                iFramePadding: styleUtils.getElementPadding(iFrame),
+                cmd:           CROSS_DOMAIN_MESSAGES.GET_IFRAME_POSITION_DATA_RESPONSE_CMD
+            };
 
-            messageSandbox.sendServiceMsg(data, e.source);
+            messageSandbox.sendServiceMsg(msg, e.source);
             break;
     }
 }
@@ -184,9 +183,9 @@ function findLineAndRectangelIntersection (pointStart, pointEnd, rectangle) {
 }
 
 export function init () {
-    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+    messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 }
 
 export function destroy () {
-    messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED, onMessage);
+    messageSandbox.off(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, onMessage);
 }

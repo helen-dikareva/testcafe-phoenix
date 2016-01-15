@@ -1,23 +1,21 @@
-import * as hammerheadAPI from '../../deps/hammerhead';
+import hammerhead from '../../deps/hammerhead';
 import testCafeCore from '../../deps/testcafe-core';
 import testCafeUI from '../../deps/testcafe-ui';
 import * as automationUtil from '../util';
 import * as automationSettings from '../settings';
 import clickPlaybackAutomation from '../playback/click';
 import async from '../../deps/async';
+import Cursor from '../cursor';
 
-var browserUtils   = hammerheadAPI.Util.Browser;
-var eventSimulator = hammerheadAPI.EventSandbox.EventSimulator;
-var nativeMethods  = hammerheadAPI.NativeMethods;
+var browserUtils   = hammerhead.utils.browser;
+var eventSimulator = hammerhead.eventSandbox.eventSimulator;
 
-var $             = testCafeCore.$;
 var SETTINGS      = testCafeCore.SETTINGS;
 var domUtils      = testCafeCore.domUtils;
 var positionUtils = testCafeCore.positionUtils;
 var styleUtils    = testCafeCore.styleUtils;
 var eventUtils    = testCafeCore.eventUtils;
 
-var cursor        = testCafeUI.cursor;
 var selectElement = testCafeUI.selectElement;
 
 
@@ -39,7 +37,7 @@ export default function (el, options, actionCallback) {
 
     if (!positionUtils.isContainOffset(el, options.offsetX, options.offsetY)) {
         point      = automationUtil.getMouseActionPoint(el, options, true);
-        curElement = cursor.getElementUnderCursor(point.x, point.y);
+        curElement = Cursor.getElementUnderCursor(point.x, point.y);
     }
 
     if (!curElement)
@@ -49,7 +47,7 @@ export default function (el, options, actionCallback) {
                              !positionUtils.isElementVisible(el),
         screenPoint        = automationUtil.getMouseActionPoint(el, options, true),
         eventPoint         = automationUtil.getEventOptionCoordinates(el, screenPoint),
-        eventOptions       = $.extend({
+        eventOptions       = hammerhead.utils.extend({
             clientX: eventPoint.x,
             clientY: eventPoint.y
         }, options);
@@ -78,8 +76,10 @@ export default function (el, options, actionCallback) {
 
                 //NOTE: touch devices only
                 cursorTouchMouseDown: function (callback) {
-                    if (browserUtils.hasTouchEvents)
-                        cursor.lMouseDown(callback);
+                    if (browserUtils.hasTouchEvents) {
+                        Cursor.leftButtonDown()
+                            .then(callback);
+                    }
                     else
                         callback();
                 },
@@ -96,8 +96,10 @@ export default function (el, options, actionCallback) {
                 },
 
                 cursorMouseDown: function (callback) {
-                    if (!browserUtils.hasTouchEvents)
-                        cursor.lMouseDown(callback);
+                    if (!browserUtils.hasTouchEvents) {
+                        Cursor.leftButtonDown()
+                            .then(callback);
+                    }
                     else
                         callback();
                 },
@@ -116,10 +118,10 @@ export default function (el, options, actionCallback) {
                         var onmousedown = function (e) {
                             wasPrevented = e.defaultPrevented;
                             eventUtils.preventDefault(e);
-                            nativeMethods.removeEventListener.call(curElement, 'mousedown', onmousedown, false);
+                            eventUtils.unbind(curElement, 'mousedown', onmousedown);
                         };
 
-                        nativeMethods.addEventListener.call(curElement, 'mousedown', onmousedown, false);
+                        eventUtils.bind(curElement, 'mousedown', onmousedown);
                     }
 
                     notPrevented = eventSimulator.mousedown(curElement, eventOptions);
@@ -153,7 +155,8 @@ export default function (el, options, actionCallback) {
                 },
 
                 cursorMouseUp: function (callback) {
-                    cursor.mouseUp(callback);
+                    Cursor.buttonUp()
+                        .then(callback);
                 },
 
                 mouseup: function (callback) {
@@ -175,7 +178,7 @@ export default function (el, options, actionCallback) {
                             domUtils.isSelectElement(curElement) &&
                             styleUtils.getSelectElementSize(curElement) === 1 && notPrevented !== false) {
                             //if this select already have options list
-                            if (selectElement.isOptionListExpanded($(curElement)))
+                            if (selectElement.isOptionListExpanded(curElement))
                                 selectElement.collapseOptionList();
                             else
                                 selectElement.expandOptionList(curElement);

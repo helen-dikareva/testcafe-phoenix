@@ -1,15 +1,10 @@
 import { open as openBrowser, close as closeBrowser } from 'testcafe-browser-natives';
 import BrowserConnection from './index';
-import COMMAND from './command';
 
 
 export default class LocalBrowserConnection extends BrowserConnection {
-    static NATIVE_ACTION_DELAY = 500;
-
     constructor (gateway, browserInfo) {
         super(gateway);
-
-        this.forceClose = false;
 
         this._runBrowser(browserInfo);
     }
@@ -22,25 +17,15 @@ export default class LocalBrowserConnection extends BrowserConnection {
                 await openBrowser(browserInfo, this.url);
             }
             catch (err) {
-                this.emit('error', err.message);
+                this.emit('error', err);
             }
         });
     }
 
-
     close () {
-        this.forceClose = true;
-
-        super.close();
-    }
-
-    getStatus () {
-        if (this.forceClose) {
-            setTimeout(() => closeBrowser(this.idleUrl), LocalBrowserConnection.NATIVE_ACTION_DELAY);
-
-            return { cmd: COMMAND.close };
-        }
-
-        return super.getStatus();
+        this.once('idle', async () => {
+            await closeBrowser(this.idleUrl);
+            super.close();
+        });
     }
 }

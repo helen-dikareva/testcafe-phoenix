@@ -1,8 +1,4 @@
-var hammerhead     = window.getTestCafeModule('hammerhead');
-var jsProcessor    = hammerhead.JSProcessor;
-
-var testCafeCore = window.getTestCafeModule('testCafeCore');
-var ERRORS       = testCafeCore.get('./errors');
+var hammerhead = window.getTestCafeModule('hammerhead');
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -40,12 +36,10 @@ $(document).ready(function () {
 
 
         asyncTest('navigate to given url', function () {
-            var savedSetProperty = window[jsProcessor.SET_PROPERTY_METH_NAME],
-                locationValue    = null;
+            var locationValue    = null;
 
-            window[jsProcessor.SET_PROPERTY_METH_NAME] = function (owner, propName, value) {
-                if (owner === window && propName === 'location')
-                    locationValue = value;
+            hammerhead.navigateTo = function (url) {
+                locationValue = url;
             };
 
             runAsyncTest(
@@ -53,7 +47,6 @@ $(document).ready(function () {
                     actionsAPI.navigateTo('http://my.site.url');
                 },
                 function () {
-                    window[jsProcessor.SET_PROPERTY_METH_NAME] = savedSetProperty;
                     strictEqual(locationValue, 'http://my.site.url');
                 },
                 2000

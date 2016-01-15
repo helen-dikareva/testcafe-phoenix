@@ -1,6 +1,6 @@
 var testCafeCore = window.getTestCafeModule('testCafeCore');
 var SETTINGS     = testCafeCore.get('./settings').get();
-var ERRORS       = testCafeCore.get('./errors');
+var ERROR_TYPE   = testCafeCore.ERROR_TYPE;
 
 var testCafeRunner = window.getTestCafeModule('testCafeRunner');
 var actionsAPI     = testCafeRunner.get('./api/actions');
@@ -22,13 +22,9 @@ $(document).ready(function () {
             action(asyncActionCallback);
         };
 
-        StepIterator.prototype.expectInactivity = function (duration, callback) {
-            callback();
-        };
-
         stepIterator.on(StepIterator.ERROR_EVENT, function (err) {
             stepIterator.state.stoppedOnFail = false;
-            currentErrorCode                 = err.code;
+            currentErrorType                 = err.type;
             currentSourceIndex               = err.__sourceIndex;
         });
 
@@ -40,11 +36,11 @@ $(document).ready(function () {
             pageLongTimeoutExpired  = false,
             pageLongTimeoutId       = null,
 
-            currentErrorCode        = null,
+            currentErrorType        = null,
             currentSourceIndex      = null,
             //constants
             SHORT_DELAY             = 10,
-            LONG_DELAY              = 1000,
+            LONG_DELAY              = 1050,
 
             //utils
             asyncActionCallback,
@@ -82,7 +78,7 @@ $(document).ready(function () {
         });
 
         QUnit.testDone(function () {
-            currentErrorCode   = null;
+            currentErrorType   = null;
             currentSourceIndex = null;
 
             SETTINGS.ENABLE_SOURCE_INDEX = false;
@@ -173,7 +169,7 @@ $(document).ready(function () {
             };
             actionsAPI.wait('abc', '#567');
             window.setTimeout(function () {
-                equal(currentErrorCode, ERRORS.API_INCORRECT_WAIT_ACTION_MILLISECONDS_ARGUMENT, 'correct error code sent');
+                equal(currentErrorType, ERROR_TYPE.incorrectWaitActionMillisecondsArgument, 'correct error type sent');
                 equal(currentSourceIndex, 567);
                 start();
             }, 500);
@@ -206,7 +202,7 @@ $(document).ready(function () {
             };
             actionsAPI.wait(condition, SHORT_DELAY, '#90');
             window.setTimeout(function () {
-                equal(currentErrorCode, ERRORS.API_INCORRECT_WAIT_ACTION_MILLISECONDS_ARGUMENT, 'correct error code sent');
+                equal(currentErrorType, ERROR_TYPE.incorrectWaitActionMillisecondsArgument, 'correct error type sent');
                 equal(currentSourceIndex, 90);
                 start();
             }, 500);
