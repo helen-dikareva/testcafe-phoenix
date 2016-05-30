@@ -36,6 +36,8 @@ var ActionCanNotFindFileToUploadError                  = require('../../lib/erro
 var ActionElementIsNotFileInputError                   = require('../../lib/errors/test-run').ActionElementIsNotFileInputError;
 var ActionUnsupportedDeviceTypeError                   = require('../../lib/errors/test-run').ActionUnsupportedDeviceTypeError;
 var ClientFunctionExecutionInterruptionError           = require('../../lib/errors/test-run').ClientFunctionExecutionInterruptionError;
+var UnexpectedDialogError                              = require('../../lib/errors/test-run').UnexpectedDialogError;
+var WasNotExpectedDialogError                          = require('../../lib/errors/test-run').WasNotExpectedDialogError;
 var MissingAwaitError                                  = require('../../lib/errors/test-run').MissingAwaitError;
 var ExternalAssertionLibraryError                      = require('../../lib/errors/test-run').ExternalAssertionLibraryError;
 var RegeneratorInFunctionArgumentOfClientFunctionError = require('../../lib/errors/test-run').RegeneratorInFunctionArgumentOfClientFunctionError;
@@ -211,6 +213,14 @@ describe('Error formatting', function () {
 
         it('Should format "actionUnsupportedDeviceTypeError" message', function () {
             assertErrorMessage('action-unsupported-device-type-error', new ActionUnsupportedDeviceTypeError('device', 'iPhone 555'));
+        });
+
+        it('Should format "unexpectedDialogError" message', function () {
+            assertErrorMessage('unexpected-dialog-error', new UnexpectedDialogError('alert', 'Alert!'));
+        });
+
+        it('Should format "wasNotExpectedDialogError" message', function () {
+            assertErrorMessage('was-not-expected-dialog-error', new WasNotExpectedDialogError('alert'));
         });
 
         it('Should format "missingAwaitError', function () {

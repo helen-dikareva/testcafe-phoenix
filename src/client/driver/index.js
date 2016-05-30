@@ -4,7 +4,8 @@ import testCafeUI from './deps/testcafe-ui';
 
 import MESSAGE from '../../test-run/client-messages';
 import COMMAND_TYPE from '../../test-run/commands/type';
-import { UncaughtErrorOnPage, ClientFunctionExecutionInterruptionError } from '../../errors/test-run';
+import { UncaughtErrorOnPage, ClientCodeExecutionInterruptionError } from '../../errors/test-run';
+import NativeDialogsMonitor from './native-dialogs-monitor';
 
 import * as browser from '../browser';
 
@@ -35,28 +36,37 @@ const PENDING_STATUS                       = 'testcafe|driver|pending-status';
 var hangingPromise = new Promise(testCafeCore.noop);
 
 export default class ClientDriver {
-    constructor (testRunId, heartbeatUrl, browserStatusUrl, elementAvailabilityTimeout) {
+    constructor (testRunId, heartbeatUrl, browserStatusUrl, elementAvailabilityTimeout, initialDialogsInfo) {
         this.testRunId                  = testRunId;
         this.heartbeatUrl               = heartbeatUrl;
         this.browserStatusUrl           = browserStatusUrl;
         this.elementAvailabilityTimeout = elementAvailabilityTimeout;
+        this.initialDialogsInfo         = initialDialogsInfo;
         this.contextStorage             = new ContextStorage(window, testRunId);
         this.beforeUnloadRaised         = false;
 
         this.pageInitialRequestBarrier = new RequestBarrier();
+
+        this.readyPromise = eventUtils
+            .documentReady()
+            .then(() => this.pageInitialRequestBarrier.wait(true));
+
+        this.nativeDialogsMonitor = new NativeDialogsMonitor(this.contextStorage);
 
         pageUnloadBarrier.init();
         preventRealEvents();
     }
 
     start () {
-        browser.startHeartbeat(this.heartbeatUrl, hammerhead.createNativeXHR);
-
-        modalBackground.initAndShowLoadingText();
         hammerhead.on(hammerhead.EVENTS.uncaughtJsError, err => this._onJsError(err));
         hammerhead.on(hammerhead.EVENTS.beforeUnload, () => this.beforeUnloadRaised = true);
 
-        var pendingStatus = this.contextStorage.getItem(PENDING_STATUS, status);
+        browser.startHeartbeat(this.heartbeatUrl, hammerhead.createNativeXHR);
+
+        modalBackground.initAndShowLoadingText();
+        this.readyPromise.then(() => modalBackground.hide());
+
+        var pendingStatus = this.contextStorage.getItem(PENDING_STATUS);
 
         // NOTE: we should not send any message to the server if we've
         // sent the 'test-done' message but haven't got the response.
@@ -82,18 +92,25 @@ export default class ClientDriver {
             return;
         }
 
-        eventUtils
-            .documentReady()
-            .then(() => this.pageInitialRequestBarrier.wait(true))
-            .then(() => {
-                var inCommandExecution = this.contextStorage.getItem(COMMAND_EXECUTING_FLAG);
+        this.nativeDialogsMonitor.init(this.initialDialogsInfo, err => {
+            this._onReady(new DriverStatus({ isCommandResult: true, executionError: err }))
+        });
 
-                modalBackground.hide();
 
-                var status = pendingStatus || new DriverStatus({ isCommandResult: inCommandExecution });
+        var inCommandExecution = this.contextStorage.getItem(COMMAND_EXECUTING_FLAG);
 
-                this._onReady(status);
-            });
+        modalBackground.hide();
+
+        var status = pendingStatus || new DriverStatus({ isCommandResult: inCommandExecution });
+        //TODO: add waiting after redirect
+        /*var dialogError = this.nativeDialogsMonitor.checkDialogsErrors();
+
+        // NOTE: we should think that native dialogs error is page error if we don't have command for execution.
+        // It can happens if dialog raised on first page load (test without using 'navigateTo' action)
+        if (dialogError)
+            status[inCommandExecution ? 'executionError' : 'pageError'] = dialogError;*/
+
+        this._onReady(status);
     }
 
     _onJsError (err) {
@@ -138,6 +155,13 @@ export default class ClientDriver {
             });
     }
 
+    _onHandleDialogCommand () {
+        this._onReady(new DriverStatus({
+            isCommandResult: true,
+            executionError:  this.nativeDialogsMonitor.checkDialogsErrors()
+        }));
+    }
+
     _onReady (status) {
         this._sendStatusToServer(status)
             .then(command => {
@@ -166,7 +190,7 @@ export default class ClientDriver {
 
     _onWaitForElementCommand (command) {
         executeWaitForElementCommand(command, this.elementAvailabilityTimeout)
-            .then(driverStatus => this._onReady(driverStatus));
+            .then(status => this._onReady(status));
     }
 
     _onNavigateToCommand (command) {
@@ -186,6 +210,7 @@ export default class ClientDriver {
         executeClientFunction(command)
             .then(driverStatus => {
                 this.contextStorage.setItem(EXECUTING_CLIENT_FUNCTION_DESCRIPTOR, null);
+
                 this._onReady(driverStatus);
             });
     }
@@ -201,26 +226,41 @@ export default class ClientDriver {
     }
 
     _onCommand (command) {
-        if (command.type === COMMAND_TYPE.testDone)
-            this._onTestDone();
+        debugger;
+        this.readyPromise
+            .then(() => {
+                if (command.type === COMMAND_TYPE.testDone)
+                    this._onTestDone();
 
-        else if (command.type === COMMAND_TYPE.executeClientFunction)
-            this._onExecuteClientFunctionCommand(command);
 
-        else if (this.contextStorage.getItem(PENDING_PAGE_ERROR))
-            this._onReady(new DriverStatus({ isCommandResult: true }));
+                else if (command.type === COMMAND_TYPE.executeClientFunction)
+                    this._onExecuteClientFunctionCommand(command);
 
-        else if (command.type === COMMAND_TYPE.waitForElement)
-            this._onWaitForElementCommand(command);
+                else if (command.type === COMMAND_TYPE.prepareBrowserManipulation)
+                    this._onPrepareBrowserManipulationCommand();
 
-        else if (command.type === COMMAND_TYPE.navigateTo)
-            this._onNavigateToCommand(command);
+                else if (this.contextStorage.getItem(PENDING_PAGE_ERROR))
+                    this._onReady(new DriverStatus({ isCommandResult: true }));
 
-        else if (command.type === COMMAND_TYPE.prepareBrowserManipulation)
-            this._onPrepareBrowserManipulationCommand();
+                else if (command.type === COMMAND_TYPE.handleConfirm)
+                    this._onHandleDialogCommand();
 
-        else
-            this._onActionCommand(command);
+                else {
+                    this.nativeDialogsMonitor.setExpectedDialogs(command.handleDialogs);
+
+                    if (command.type === COMMAND_TYPE.waitForElement)
+                        this._onWaitForElementCommand(command);
+
+                    else if (command.type === COMMAND_TYPE.navigateTo)
+                        this._onNavigateToCommand(command);
+
+                    else if (command.type === COMMAND_TYPE.wait)
+                        this._onReady(new DriverStatus({ isCommandResult: true }));
+
+                    else
+                        this._onActionCommand(command);
+                }
+            });
     }
 
     _onTestDone () {

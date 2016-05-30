@@ -37,6 +37,8 @@ export default {
     actionIncorrectKeysError:                'actionIncorrectKeysError',
     actionCanNotFindFileToUploadError:       'actionCanNotFindFileToUploadError',
     actionUnsupportedDeviceTypeError:        'actionUnsupportedDeviceTypeError',
+    unexpectedDialogError:                   'unexpectedDialogError',
+    wasNotExpectedDialogError:               'wasNotExpectedDialogError',
 
     clientFunctionExecutionInterruptionError:           'clientFunctionExecutionInterruptionError',
     regeneratorInFunctionArgumentOfClientFunctionError: 'regeneratorInFunctionArgumentOfClientFunctionError',

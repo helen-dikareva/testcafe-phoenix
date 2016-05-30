@@ -1,0 +1,33 @@
+{
+    "fixtures": [
+        {
+            "name": "Native-dialogs",
+            "pageUrl": "http://localhost:3000/native-dialogs-handling/raw/pages/confirm.html",
+            "tests": [
+                {
+                    "name": "Expected confirm after page load",
+                    "commands": [
+                        {
+                            "type": "handle-confirm",
+                            "result": true
+                        },
+                        {
+                            "type": "click",
+                            "selector": "#getResult"
+                        }
+                    ]
+                },
+                {
+                    "name": "Unexpected confirm after page load",
+                    "commands": [
+                        {
+                            "type": "click",
+                            "selector": "#getResult",
+                            "callsite": "[[Unexpected confirm after page load callsite]]"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

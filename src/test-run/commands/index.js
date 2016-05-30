@@ -536,6 +536,7 @@ export class ResizeWindowToFitDeviceCommand extends Assignable {
         this.type     = TYPE.resizeWindowToFitDevice;
         this.device   = null;
         this.portrait = false;
+
         this._assignFrom(obj, true);
     }
 
@@ -543,6 +544,29 @@ export class ResizeWindowToFitDeviceCommand extends Assignable {
         return [
             { name: 'device', type: resizeWindowDeviceArgument, required: true },
             { name: 'portrait', type: booleanArgument }
+        ];
+    }
+}
+
+export class HandleAlertCommand {
+    constructor () {
+        this.type = TYPE.handleAlert;
+    }
+}
+
+export class HandleConfirmCommand extends Assignable {
+    constructor (obj) {
+        super(obj);
+
+        this.type   = TYPE.handleConfirm;
+        this.result = false;
+
+        this._assignFrom(obj, true);
+    }
+
+    _getAssignableProperties () {
+        return [
+            { name: 'result', type: booleanArgument }
         ];
     }
 }
@@ -616,6 +640,9 @@ export function createCommandFromObject (obj) {
         case TYPE.resizeWindowToFitDevice:
             return new ResizeWindowToFitDeviceCommand(obj);
 
+        case TYPE.handleConfirm:
+            return new HandleConfirmCommand(obj);
+
         case TYPE.testDone:
             return new TestDoneCommand();
     }
@@ -643,5 +670,9 @@ export function isServiceCommand (command) {
     return command.type === TYPE.testDone ||
            command.type === TYPE.takeScreenshotOnFail ||
            command.type === TYPE.prepareBrowserManipulation;
+}
+
+export function isHandleCommand(command){
+    return command.type === TYPE.handleConfirm;
 }
 

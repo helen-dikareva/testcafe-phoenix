@@ -295,10 +295,10 @@ gulp.task('update-greenkeeper', function () {
 });
 
 
-gulp.task('build', ['lint', 'update-greenkeeper', 'server-scripts', 'client-scripts', 'styles', 'images', 'templates']);
+gulp.task('build', [/*'lint', */'update-greenkeeper', 'server-scripts', 'client-scripts', 'styles', 'images', 'templates']);
 
 // Test
-gulp.task('test-server', ['build'], function () {
+gulp.task('test-server', [/*'build'*/], function () {
     return gulp
         .src('test/server/*-test.js')
         .pipe(mocha({
@@ -442,12 +442,12 @@ gulp.task('publish-website', ['build-website'], function () {
 
 gulp.task('test-docs', ['test-website', 'lint']);
 
-gulp.task('test-functional', ['build'], function () {
+gulp.task('test-functional', [/*'build'*/], function () {
     return gulp
         .src(['test/functional/setup.js', 'test/functional/**/test.js'])
         .pipe(mocha({
             ui:       'bdd',
             reporter: 'spec',
-            timeout:  typeof v8debug === 'undefined' ? 30000 : Infinity // NOTE: disable timeouts in debug
+            timeout:  typeof v8debug === 'undefined' ? Infinity : Infinity // NOTE: disable timeouts in debug
         }));
 });

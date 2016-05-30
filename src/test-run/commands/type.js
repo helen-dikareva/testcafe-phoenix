@@ -26,5 +26,7 @@ export default {
     prepareBrowserManipulation: 'prepare-browser-manipulation',
     resizeWindow:               'resize-window',
     resizeWindowToFitDevice:    'resize-window-to-fit-device',
+    handleAlert:                'handle-alert',
+    handleConfirm:              'handle-confirm',
     testDone:                   'test-done'
 };

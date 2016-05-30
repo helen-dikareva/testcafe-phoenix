@@ -23,17 +23,20 @@ import {
     ClearUploadCommand,
     TakeScreenshotCommand,
     ResizeWindowCommand,
-    ResizeWindowToFitDeviceCommand
+    ResizeWindowToFitDeviceCommand,
+    HandleConfirmCommand,
+    isHandleCommand
 } from '../test-run/commands';
 
 const API_IMPLEMENTATION_METHOD_RE = /^_(\S+)\$$/;
 
 export default class TestController {
     constructor (testRun) {
-        this.testRun              = testRun;
-        this.executionChain       = Promise.resolve();
-        this.apiMethods           = this._createAPIMethodsList();
-        this.callsiteWithoutAwait = null;
+        this.testRun                 = testRun;
+        this.executionChain          = Promise.resolve();
+        this.notHandleExecutionChain = this.executionChain;
+        this.apiMethods              = this._createAPIMethodsList();
+        this.callsiteWithoutAwait    = null;
     }
 
     _createAPIMethodsList () {
@@ -100,7 +103,22 @@ export default class TestController {
             throw err;
         }
 
-        this.executionChain       = this.executionChain.then(() => this.testRun.executeCommand(command, callsite));
+        debugger;
+        if (isHandleCommand(command)) {
+            this.executionChain = this.notHandleExecutionChain.then(() => {
+                debugger;
+                return this.testRun.executeCommand(command, callsite)
+            });
+        }
+        else {
+            this.notHandleExecutionChain = this.executionChain;
+
+            this.executionChain = this.executionChain.then(() => {
+                debugger;
+                return this.testRun.executeCommand(command, callsite)
+            });
+        }
+
         this.callsiteWithoutAwait = callsite;
 
         return this._createExtendedPromise(this.executionChain, callsite);
@@ -198,6 +216,11 @@ export default class TestController {
 
     _resizeWindowToFitDevice$ (device, portrait) {
         return this._enqueueAction('resizeWindowToFitDevice', ResizeWindowToFitDeviceCommand, { device, portrait });
+    }
+
+    _handleConfirm$ (result) {
+        debugger;
+        return this._enqueueAction('handleConfirm', HandleConfirmCommand, { result });
     }
 
     _eval$ (fn, dependencies) {

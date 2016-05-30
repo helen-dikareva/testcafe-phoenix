@@ -302,3 +302,20 @@ export class ActionElementIsNotFileInputError extends TestRunErrorBase {
         super(TYPE.actionElementIsNotFileInputError);
     }
 }
+
+export class UnexpectedDialogError extends TestRunErrorBase {
+    constructor (dialogType, dialogText) {
+        super(TYPE.unexpectedDialogError);
+
+        this.dialogType = dialogType;
+        this.dialogText = dialogText;
+    }
+}
+
+export class WasNotExpectedDialogError extends TestRunErrorBase {
+    constructor (dialogType) {
+        super(TYPE.wasNotExpectedDialogError);
+
+        this.dialogType = dialogType;
+    }
+}

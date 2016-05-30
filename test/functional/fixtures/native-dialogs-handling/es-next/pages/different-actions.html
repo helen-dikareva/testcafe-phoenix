@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<button id="withDialog">With dialog</button>
+<button id="withoutDialog">Without dialog</button>
+
+<button id="button" style="display: none;"></button>
+
+<script>
+    function makeButtonVisible (needDialog) {
+        window.setTimeout(function () {
+            if (needDialog)
+                alert('Alert!');
+
+            document.getElementById('button').style.display = "block";
+        }, 1000);
+    }
+
+    document.getElementById('withDialog').addEventListener('click', function () {
+        makeButtonVisible(true);
+    });
+
+    document.getElementById('withoutDialog').addEventListener('click', function () {
+        makeButtonVisible();
+    });
+
+    window.onresize = function () {
+        if (window.innerWidth === 480 && window.innerHeight === 320){
+            debugger;
+            alert('Alert!');
+        }
+    };
+</script>
+</body>
+</html>

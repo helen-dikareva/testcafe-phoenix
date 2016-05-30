@@ -57,7 +57,7 @@ export class OffsetOptions extends Assignable {
         return [
             { name: 'offsetX', type: positiveInteger },
             { name: 'offsetY', type: positiveInteger }
-        ];
+        ]
     }
 }
 

@@ -26,6 +26,9 @@ const TEST_DONE_CONFIRMATION_RESPONSE = 'test-done-confirmation';
 const MAX_RESPONSE_DELAY              = 2 * 60 * 1000;
 
 
+var nextTick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+
 export default class TestRun extends Session {
     constructor (test, browserConnection, screenshotCapturer, opts) {
         var uploadsRoot = path.dirname(test.fixture.path);
@@ -43,6 +46,7 @@ export default class TestRun extends Session {
         this.driverTaskQueue          = [];
         this.browserManipulationQueue = [];
         this.testDoneCommandQueued    = false;
+        this.initialDialogsInfo       = [];
 
         this.pendingRequest   = null;
         this.pendingPageError = null;
@@ -58,16 +62,21 @@ export default class TestRun extends Session {
         this.errs                     = [];
         this.lastDriverStatusId       = null;
         this.lastDriverStatusResponse = null;
+
+        debugger;
+        this._start();
     }
 
 
     // Hammerhead payload
     _getPayloadScript () {
+        debugger;
         return Mustache.render(TEST_RUN_TEMPLATE, {
             testRunId:                  this.id,
             browserHeartbeatUrl:        this.browserConnection.heartbeatUrl,
             browserStatusUrl:           this.browserConnection.statusUrl,
-            elementAvailabilityTimeout: this.opts.elementAvailabilityTimeout
+            elementAvailabilityTimeout: this.opts.elementAvailabilityTimeout,
+            initialDialogsInfo:         JSON.stringify(this.initialDialogsInfo)
         });
     }
 
@@ -159,8 +168,14 @@ export default class TestRun extends Session {
 
     // Task queue
     _enqueueCommand (command, callsite) {
-        if (this.pendingRequest)
-            this._resolvePendingRequest(command);
+        debugger;
+        if (this.pendingRequest) {
+            nextTick()
+                .then(() => {
+                    debugger;
+                    this._resolvePendingRequest(command);
+                });
+        }
 
         return new Promise((resolve, reject) => this.driverTaskQueue.push({ command, resolve, reject, callsite }));
     }
@@ -227,10 +242,16 @@ export default class TestRun extends Session {
     }
 
     _handleDriverRequest (driverStatus) {
-        if (!this.running)
-            this._start();
-
+        debugger;
         var currentTaskRejectedByError = driverStatus.pageError && this._handlePageErrorStatus(driverStatus.pageError);
+
+        if (this.currentDriverTask && this.currentDriverTask.command.type === COMMAND_TYPE.wait) {
+            return new Promise(resolve => setTimeout(() => {
+                    this._fulfillCurrentDriverTask(driverStatus);
+                    resolve();
+                },
+                this.currentDriverTask.command.timeout));
+        }
 
         if (!currentTaskRejectedByError && driverStatus.isCommandResult) {
             if (this.currentDriverTask.command.type === COMMAND_TYPE.testDone) {
@@ -249,6 +270,7 @@ export default class TestRun extends Session {
     executeCommand (command, callsite) {
         this.debugLog.command(command);
 
+        debugger;
         if (this.pendingPageError && isCommandRejectableByPageError(command))
             return this._rejectCommandWithPageError(callsite);
 
@@ -258,11 +280,26 @@ export default class TestRun extends Session {
             return this.executeCommand(new PrepareBrowserManipulationCommand());
         }
 
-        if (command.type === COMMAND_TYPE.wait)
-            return new Promise(resolve => setTimeout(resolve, command.timeout));
+        /*if (command.type === COMMAND_TYPE.wait)
+            return new Promise(resolve => setTimeout(resolve, command.timeout));*/
 
         if (command.type === COMMAND_TYPE.testDone)
             this.testDoneCommandQueued = true;
+
+        if (command.type === COMMAND_TYPE.handleConfirm) {
+            var dialogInfo = { type: 'confirm', result: command.result };
+
+            if (!this.driverTaskQueue.length)
+                this.initialDialogsInfo.push(dialogInfo);
+            else {
+                var prevCommand = this.driverTaskQueue[this.driverTaskQueue.length - 1].command;
+
+                if (!prevCommand.handleDialogs)
+                    prevCommand.handleDialogs = [];
+
+                prevCommand.handleDialogs.push(dialogInfo);
+            }
+        }
 
         return this._enqueueCommand(command, callsite);
     }
@@ -286,6 +323,8 @@ TestRun.activeTestRuns = {};
 var ServiceMessages = TestRun.prototype;
 
 ServiceMessages[CLIENT_MESSAGES.ready] = function (msg) {
+    debugger;
+    this.initialDialogsInfo = [];
     this.debugLog.driverMessage(msg);
 
     this._clearPendingRequest();

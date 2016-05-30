@@ -830,7 +830,7 @@ describe('Compiler', function () {
                     })
                     .catch(function (err) {
                         expect(err.message).eql(expectedError);
-                        expect(testRun.commands.length).eql(1);
+                        expect(testRun.commands.length).eql(2);
                     });
             });
         });

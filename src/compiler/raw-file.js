@@ -10,21 +10,22 @@ export default class RawFileCompiler {
 
     static _createTestFn (commands) {
         return async testRun => {
-            for (var i = 0; i < commands.length; i++) {
-                var callsite = commands[i] && commands[i].callsite;
-                var command  = null;
+            var commandPromises = commands.map(command => {
+                var callsite = command && command.callsite;
 
                 try {
-                    command = createCommandFromObject(commands[i]);
+                    command = createCommandFromObject(command);
                 }
                 catch (err) {
                     err.callsite = callsite;
                     throw err;
                 }
 
-                await testRun.executeCommand(command, callsite);
-            }
-        };
+                return testRun.executeCommand(command, callsite);
+            });
+
+            return await Promise.all(commandPromises);
+        }
     }
 
     static _compileTest (fixture, test) {

@@ -200,6 +200,18 @@ export default {
 
     [TYPE.actionUnsupportedDeviceTypeError]: err => markup(err, `
         The <code>${err.argumentName}</code> argument specifies an unsupported <code>${err.actualValue}</code> device. For a list of supported devices, refer to <a href="http://viewportsizes.com">http://viewportsizes.com</a>
+        
+        ${err.getCallsiteMarkup()}
+`),
+
+    [TYPE.unexpectedDialogError]: err => markup(err, `
+        Unexpected system <code>${err.dialogType}</code> dialog with text "${err.dialogText}" appeared.
+
+        ${err.getCallsiteMarkup()}
+    `),
+
+    [TYPE.wasNotExpectedDialogError]: err => markup(err, `
+        The expected system <code>${err.dialogType}</code> dialog did not appear.
 
         ${err.getCallsiteMarkup()}
     `),
