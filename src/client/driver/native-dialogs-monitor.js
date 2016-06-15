@@ -37,31 +37,44 @@ export default class NativeDialogsMonitor extends EventEmitter {
             .catch(() => new WasNotExpectedDialogError(dialogWithError));
     }
 
-    _checkExpectedDialogs () {
-        var dialogInfo = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG);
+    _findDialog (type) {
+        var dialogInfo = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
 
-        if (!dialogInfo || !dialogInfo.expectedDialogs.length)
-            return null;
+        for (var i = 0; i < dialogInfo.expectedDialogs.length; i++) {
+            if (dialogInfo.expectedDialogs[i].type === type)
+                return dialogInfo.expectedDialogs[i];
+        }
+    }
 
-        return new WasNotExpectedDialogError(dialogInfo.expectedDialogs.shift().type);
+    _checkExpectedDialogs (type) {
+        if (this._findDialog(type))
+            return new WasNotExpectedDialogError(type);
     }
 
     init (initialDialogsInfo, errorHandler) {
-        this.setExpectedDialogs(initialDialogsInfo);
+        if (initialDialogsInfo && initialDialogsInfo.length)
+            this.setExpectedDialogs(initialDialogsInfo);
+
         this.unexpectedDialogErrorHandler = errorHandler;
 
         hammerhead.on(hammerhead.EVENTS.beforeUnload, e => {
             if (!e.prevented || e.isFakeIEEvent)
                 return;
 
-            var dialogType     = 'beforeUnload';
+            var dialogType     = 'beforeunload';
             var dialogsInfo    = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
-            var expectedDialog = dialogsInfo.expectedDialogs[dialogType];
+            var expectedDialog = dialogsInfo.expectedDialogs.shift();
+            var dialogText     = e.returnValue.toString() || '';
 
-            if (!expectedDialog)
-                return new UnexpectedDialogError(dialogType, e.returnValue.toString() || '');
+            if (dialogsInfo.unexpectedError)
+                return;
 
-            dialogsInfo.actualDialogs[dialogType] = true;
+            if (!expectedDialog || expectedDialog.type !== dialogType) {
+                dialogsInfo.unexpectedError = true;
+                this.unexpectedDialogErrorHandler(new UnexpectedDialogError(dialogType, dialogText));
+            }
+
+            dialogsInfo.actualDialogs.push({ type: dialogType, dialogText });
             this.contextStorage.setItem(NATIVE_DIALOGS_INFO_FLAG, dialogsInfo);
         });
 
@@ -69,14 +82,17 @@ export default class NativeDialogsMonitor extends EventEmitter {
             debugger;
             var dialogType     = 'alert';
             var dialogsInfo    = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
-            var expectedDialog = dialogsInfo.expectedDialogs[dialogType];
+            var expectedDialog = dialogsInfo.expectedDialogs.shift();
 
-            if (!expectedDialog) {
-                this.unexpectedDialogErrorHandler(new UnexpectedDialogError(dialogType, text));
+            if (dialogsInfo.unexpectedError)
                 return;
+
+            if (!expectedDialog || expectedDialog.type !== dialogType) {
+                dialogsInfo.unexpectedError = true;
+                this.unexpectedDialogErrorHandler(new UnexpectedDialogError(dialogType, text));
             }
 
-            dialogsInfo.actualDialogs[dialogType] = true;
+            dialogsInfo.actualDialogs.push({ type: dialogType, text });
             this.contextStorage.setItem(NATIVE_DIALOGS_INFO_FLAG, dialogsInfo);
         };
 
@@ -86,9 +102,12 @@ export default class NativeDialogsMonitor extends EventEmitter {
             var dialogsInfo    = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
             var expectedDialog = dialogsInfo.expectedDialogs.shift();
 
-            if (!expectedDialog || expectedDialog.type !== dialogType) {
-                this.unexpectedDialogErrorHandler(new UnexpectedDialogError(dialogType, text));
+            if (dialogsInfo.unexpectedError)
                 return false;
+
+            if (!expectedDialog || expectedDialog.type !== dialogType) {
+                dialogsInfo.unexpectedError = true;
+                this.unexpectedDialogErrorHandler(new UnexpectedDialogError(dialogType, text));
             }
 
             dialogsInfo.actualDialogs.push({ type: dialogType, text });
@@ -100,12 +119,17 @@ export default class NativeDialogsMonitor extends EventEmitter {
         window.prompt = text => {
             var dialogType     = 'prompt';
             var dialogsInfo    = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
-            var expectedDialog = dialogsInfo.expectedDialogs[dialogType];
+            var expectedDialog = dialogsInfo.expectedDialogs.shift();
 
-            if (!expectedDialog)
-                return new UnexpectedDialogError(dialogType, text);
+            if (dialogsInfo.unexpectedError)
+                return null;
 
-            dialogsInfo.actualDialogs[dialogType] = true;
+            if (!expectedDialog || expectedDialog.type !== dialogType) {
+                dialogsInfo.unexpectedError = true;
+                this.unexpectedDialogErrorHandler(new UnexpectedDialogError(dialogType, text));
+            }
+
+            dialogsInfo.actualDialogs.push({ type: dialogType, text });
             this.contextStorage.setItem(NATIVE_DIALOGS_INFO_FLAG, dialogsInfo);
 
             return expectedDialog ? expectedDialog.result : null;
@@ -115,19 +139,20 @@ export default class NativeDialogsMonitor extends EventEmitter {
     setExpectedDialogs (expectedDialogsInfo) {
         var dialogInfo = {
             expectedDialogs: expectedDialogsInfo || [],
-            actualDialogs:   []
+            actualDialogs:   [],
+            unexpectedError: false
         };
 
         this.contextStorage.setItem(NATIVE_DIALOGS_INFO_FLAG, dialogInfo);
     }
 
-    checkDialogsErrors (timeout) {
+    checkDialogsErrors (type, timeout) {
         var dialogInfo = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG);
 
         if (!dialogInfo)
             return timeout ? Promise.resolve(null) : null;
 
 
-        return timeout ? this._waitForExpectedDialogs(timeout) : this._checkExpectedDialogs();
+        return timeout ? this._waitForExpectedDialogs(timeout) : this._checkExpectedDialogs(type);
     }
 }

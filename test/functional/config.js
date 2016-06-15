@@ -19,7 +19,7 @@ module.exports = {
             platform:    'Windows 10',
             browserName: 'chrome',
             alias:       'chrome'
-        },
+        }/*,
         {
             platform:    'Windows 10',
             browserName: 'internet explorer',
@@ -30,7 +30,7 @@ module.exports = {
             platform:    'Windows 10',
             browserName: 'firefox',
             alias:       'ff'
-        }
+        }*/
     ],
 
     testCafe: {

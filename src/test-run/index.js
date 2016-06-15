@@ -16,7 +16,8 @@ import {
     PrepareBrowserManipulationCommand,
     isCommandRejectableByPageError,
     isWindowManipulationCommand,
-    isServiceCommand
+    isServiceCommand,
+    isHandleCommand
 } from './commands';
 
 
@@ -47,6 +48,7 @@ export default class TestRun extends Session {
         this.browserManipulationQueue = [];
         this.testDoneCommandQueued    = false;
         this.initialDialogsInfo       = [];
+        this.shouldSetInitialDialogs  = true;
 
         this.pendingRequest   = null;
         this.pendingPageError = null;
@@ -63,20 +65,25 @@ export default class TestRun extends Session {
         this.lastDriverStatusId       = null;
         this.lastDriverStatusResponse = null;
 
-        debugger;
         this._start();
     }
 
 
     // Hammerhead payload
     _getPayloadScript () {
-        debugger;
+        var initialDialogsInfo = this.shouldSetInitialDialogs ? this.initialDialogsInfo : [];
+
+        if (this.shouldSetInitialDialogs) {
+            this.initialDialogsInfo      = [];
+            this.shouldSetInitialDialogs = false;
+        }
+
         return Mustache.render(TEST_RUN_TEMPLATE, {
             testRunId:                  this.id,
             browserHeartbeatUrl:        this.browserConnection.heartbeatUrl,
             browserStatusUrl:           this.browserConnection.statusUrl,
             elementAvailabilityTimeout: this.opts.elementAvailabilityTimeout,
-            initialDialogsInfo:         JSON.stringify(this.initialDialogsInfo)
+            initialDialogsInfo:         JSON.stringify(initialDialogsInfo)
         });
     }
 
@@ -135,6 +142,7 @@ export default class TestRun extends Session {
                 await this._executeTestFn(STATE.inAfterEach, afterEachFn);
         }
 
+        debugger;
         await this.executeCommand(new TestDoneCommand());
         this._addPendingPageErrorIfAny();
 
@@ -168,11 +176,9 @@ export default class TestRun extends Session {
 
     // Task queue
     _enqueueCommand (command, callsite) {
-        debugger;
         if (this.pendingRequest) {
             nextTick()
                 .then(() => {
-                    debugger;
                     this._resolvePendingRequest(command);
                 });
         }
@@ -182,6 +188,24 @@ export default class TestRun extends Session {
 
     _removeAllNonServiceTasks () {
         this.driverTaskQueue = this.driverTaskQueue.filter(driverTask => isServiceCommand(driverTask.command));
+    }
+
+    _getLastNotHandleCommand () {
+        var length = this.driverTaskQueue.length;
+
+        if (!length)
+            return null;
+
+        for (var i = length - 1; i >= 0; i--) {
+            if (!isHandleCommand(this.driverTaskQueue[i].command))
+                return this.driverTaskQueue[i].command;
+        }
+    }
+
+    _rejectAllHandleCommandTasks (err) {
+        var handleCommandTasks = this.driverTaskQueue.filter(driverTask => isHandleCommand(driverTask.command));
+
+        handleCommandTasks.forEach(task => task.reject(err));
     }
 
 
@@ -202,6 +226,7 @@ export default class TestRun extends Session {
         err.callsite = err.callsite || this.driverTaskQueue[0].callsite;
 
         this.currentDriverTask.reject(err);
+        this._rejectAllHandleCommandTasks(err);
         this._removeAllNonServiceTasks();
     }
 
@@ -286,19 +311,22 @@ export default class TestRun extends Session {
         if (command.type === COMMAND_TYPE.testDone)
             this.testDoneCommandQueued = true;
 
-        if (command.type === COMMAND_TYPE.handleConfirm) {
-            var dialogInfo = { type: 'confirm', result: command.result };
+        if (isHandleCommand(command)) {
+            var dialogInfo = {
+                type:   command.type.replace(/handle|-/g, ''),
+                result: command.result
+            };
 
-            if (!this.driverTaskQueue.length)
-                this.initialDialogsInfo.push(dialogInfo);
-            else {
-                var prevCommand = this.driverTaskQueue[this.driverTaskQueue.length - 1].command;
+            var lastCommand = this._getLastNotHandleCommand();
 
-                if (!prevCommand.handleDialogs)
-                    prevCommand.handleDialogs = [];
+            if (lastCommand) {
+                if (!lastCommand.handleDialogs)
+                    lastCommand.handleDialogs = [];
 
-                prevCommand.handleDialogs.push(dialogInfo);
+                lastCommand.handleDialogs.push(dialogInfo);
             }
+            else
+                this.initialDialogsInfo.push(dialogInfo);
         }
 
         return this._enqueueCommand(command, callsite);

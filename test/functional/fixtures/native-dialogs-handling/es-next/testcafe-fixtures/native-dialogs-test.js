@@ -1,35 +1,24 @@
-import { Hybrid } from 'testcafe';
+import { ClientFunction } from 'testcafe';
 import { expect } from 'chai';
 
 fixture `Native dialogs`
     .page `http://localhost:3000/native-dialogs-handling/es-next/pages/index.html`;
 
-const getResult = Hybrid(() => document.getElementById('result').textContent);
+const getResult = ClientFunction(() => document.getElementById('result').textContent);
 
 // Alert
-/*
 test('No expected alert after an action', async t => {
     await t
-        .click('#withoutDialog', {
-            handleDialogs: { alert: true }
-        });
+        .click('#withoutDialog')
+        .handleAlert();
 });
 
 test('Unexpected alert after an action', async t => {
     await t
         .click('#buttonAlert');
 });
-*/
 
 //Confirm
-test('Expected confirm after an action', async t => {
-    await t
-        .click('#buttonConfirm')
-        .handleConfirm(true);
-
-    expect(await getResult()).equals('true');
-});
-
 test('No expected confirm after an action', async t => {
     await t
         .click('#withoutDialog')
@@ -41,21 +30,11 @@ test('Unexpected confirm after an action', async t => {
         .click('#buttonConfirm');
 });
 
-test('No expected confirm after page load', async t => {
-    await t
-        .handleConfirm(true)
-        .click('#withoutDialog');
-});
-
 //Prompt
-/*
 test('No expected prompt after an action', async t => {
     await t
-        .click('#withoutDialog', {
-            handleDialogs: {
-                prompt: { result: 'text' }
-            }
-        })
+        .click('#withoutDialog')
+        .handlePrompt('text');
 });
 
 test('Unexpected prompt after an action', async t => {
@@ -63,36 +42,56 @@ test('Unexpected prompt after an action', async t => {
         .click('#buttonPrompt');
 });
 
+//BeforeUnload
+test('No expected beforeUnload after an action', async t => {
+    await t
+        .click('#linkToThisPage')
+        .handleBeforeUnload();
+});
+
+test('Unexpected beforeUnload after an action', async t => {
+    await t
+        .click('#enableBeforeUnload')
+        .click('#linkToThisPage');
+});
+
 //Dialog sequence
 test('Dialogs sequence appears after an action', async t => {
     await t
-        .click('#buttonAllDialogsSequence', {
-            handleDialogs: {
-                confirm: { result: true },
-                alert:   true,
-                prompt:  { result: null }
-            }
-        });
+        .click('#enableBeforeUnload')
+        .click('#buttonAllDialogsSequence')
+        .handleAlert()
+        .handleAlert()
+        .handleConfirm(true)
+        .handleConfirm(false)
+        .handlePrompt('text')
+        .handlePrompt(null)
+        .handleBeforeUnload();
 });
 
 test('No expected prompt in dialogs sequence after an action', async t => {
     await t
-        .click('#buttonDialogsSequence', {
-            handleDialogs: {
-                confirm: { result: true },
-                alert:   true,
-                prompt:  { result: null }
-            }
-        });
+        .click('#buttonAlertConfirm')
+        .handleAlert()
+        .handleConfirm(true)
+        .handlePrompt(null);
 });
 
 test('Unexpected confirm in dialogs sequence after an action', async t => {
     await t
-        .click('#buttonDialogsSequence', {
-            handleDialogs: { alert: true }
-        });
+        .click('#buttonDialogsSequence')
+        .handleAlert()
+        .handlePrompt();
 });
 
+//Page load
+test('No expected confirm after page load', async t => {
+    await t
+        .handleConfirm(true)
+        .click('#withoutDialog');
+});
+
+/*
 //Timeout after action
 test('Dialog alert appears with some timeout after an action', async t => {
     await t
@@ -209,19 +208,6 @@ test('Dialogs beforeUnload appears after an action', async t => {
         .click('#linkToThisPage', {
             handleDialogs: { beforeUnload: true }
         });
-});
-
-test('No expected beforeUnload after an action', async t => {
-    await t
-        .click('#linkToThisPage', {
-            handleDialogs: { beforeUnload: true }
-        });
-});
-
-test('Unexpected beforeUnload after an action', async t => {
-    await t
-        .click('#enableBeforeUnload')
-        .click('#linkToThisPage');
 });
 */
 

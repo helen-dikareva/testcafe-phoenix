@@ -10,6 +10,7 @@
 <button id="buttonPrompt">Prompt</button>
 
 <button id="buttonAllDialogsSequence">AllDialogsSequence</button>
+<button id="buttonAlertConfirm">AllDialogsSequence</button>
 <button id="buttonDialogsSequence">DialogsSequence</button>
 <button id="buttonDialogAfterTimeout">DialogAfterTimeout</button>
 <button id="buttonRedirect">RedirectBetweenDialogs</button>
@@ -29,7 +30,7 @@
     });
 
     document.getElementById('buttonConfirm').addEventListener('click', function () {
-        document.getElementById('result').textContent = confirm('Confirm?');
+        confirm('Confirm?');
     });
 
     document.getElementById('buttonPrompt').addEventListener('click', function () {
@@ -43,13 +44,18 @@
         confirm('Confirm?');
         prompt('Prompt:', 'defaultText');
         prompt('Prompt:', 'defaultText');
+        document.location.reload();
+    });
+
+    document.getElementById('buttonAlertConfirm').addEventListener('click', function () {
+        alert('Alert!');
+        confirm('Confirm?');
     });
 
     document.getElementById('buttonDialogsSequence').addEventListener('click', function () {
         alert('Alert!');
-        alert('Alert!');
         confirm('Confirm?');
-        confirm('Confirm?');
+        prompt('Prompt:', 'defaultText');
     });
 
     document.getElementById('buttonDialogAfterTimeout').addEventListener('click', function () {

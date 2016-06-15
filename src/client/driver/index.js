@@ -155,13 +155,6 @@ export default class ClientDriver {
             });
     }
 
-    _onHandleDialogCommand () {
-        this._onReady(new DriverStatus({
-            isCommandResult: true,
-            executionError:  this.nativeDialogsMonitor.checkDialogsErrors()
-        }));
-    }
-
     _onReady (status) {
         this._sendStatusToServer(status)
             .then(command => {
@@ -225,6 +218,13 @@ export default class ClientDriver {
             });
     }
 
+    _onHandleDialogCommand (command) {
+        this._onReady(new DriverStatus({
+            isCommandResult: true,
+            executionError:  this.nativeDialogsMonitor.checkDialogsErrors(command.type.replace(/handle|-/g, ''))
+        }));
+    }
+
     _onCommand (command) {
         debugger;
         this.readyPromise
@@ -242,8 +242,9 @@ export default class ClientDriver {
                 else if (this.contextStorage.getItem(PENDING_PAGE_ERROR))
                     this._onReady(new DriverStatus({ isCommandResult: true }));
 
-                else if (command.type === COMMAND_TYPE.handleConfirm)
-                    this._onHandleDialogCommand();
+                else if (command.type === COMMAND_TYPE.handleAlert || command.type === COMMAND_TYPE.handleConfirm ||
+                         command.type === COMMAND_TYPE.handlePrompt || command.type === COMMAND_TYPE.handleBeforeUnload)
+                    this._onHandleDialogCommand(command);
 
                 else {
                     this.nativeDialogsMonitor.setExpectedDialogs(command.handleDialogs);

@@ -1,32 +1,161 @@
 var errorInEachBrowserContains = require('../../../assertion-helper.js').errorInEachBrowserContains;
 
 
-describe('Native dialogs handling222', function () {
-    it('Should pass if the expected confirm dialog appears after an action', function () {
-        return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected confirm after an action');
+describe('[ES-NEXT] Native dialogs handling', function () {
+    /*   it('Should pass if the expected confirm dialog appears after an action', function () {
+           return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected confirm after an action');
+       });*/
+
+    describe('Errors during dialogs handling', function () {
+        it("Should fail if the expected alert dialog doesn't appear after an action", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected alert after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'The expected system alert dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        '11 |    await t ' +
+                        '12 |        .click(\'#withoutDialog\')' +
+                        ' > 13 |        .handleAlert(); ',
+                        0)
+                });
+        });
+
+        it('Should fail when an unexpected alert dialog appears after an action', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected alert after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'Unexpected system alert dialog with text "Alert!" appeared.', 0);
+                    errorInEachBrowserContains(errs,
+                        '17 |    await t > ' +
+                        '18 |        .click(\'#buttonAlert\'); ',
+                        0);
+                });
+        });
+
+        it("Should fail if the expected confirm dialog doesn't appear after an action", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'The expected system confirm dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        '23 |    await t ' +
+                        '24 |        .click(\'#withoutDialog\') ' +
+                        '> 25 |        .handleConfirm(true);',
+                        0);
+                });
+        });
+
+        it('Should fail when an unexpected confirm dialog appears after an action', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
+                    errorInEachBrowserContains(errs,
+                        '29 |    await t ' +
+                        '> 30 |        .click(\'#buttonConfirm\');',
+                        0);
+                });
+        });
+
+        it("Should fail if the expected prompt dialog doesn't appear after an action", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected prompt after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'The expected system prompt dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        'await t ' +
+                        '36 |        .click(\'#withoutDialog\') ' +
+                        '> 37 |        .handlePrompt(\'text\');',
+                        0);
+                });
+        });
+
+        it('Should fail when an unexpected prompt dialog appears after an action', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected prompt after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'Unexpected system prompt dialog with text "Prompt:" appeared.', 0);
+                    errorInEachBrowserContains(errs,
+                        '41 |    await t ' +
+                        '> 42 |        .click(\'#buttonPrompt\');',
+                        0);
+                });
+        });
+
+        it("Should fail if the expected beforeUnload dialog doesn't appear after an action", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected beforeUnload after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'The expected system beforeunload dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        '47 |    await t ' +
+                        '48 |        .click(\'#linkToThisPage\') ' +
+                        '> 49 |        .handleBeforeUnload();',
+                        0);
+                });
+        });
+
+        it('Should fail when an unexpected beforeUnload dialog appears after an action', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected beforeUnload after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'Unexpected system beforeunload dialog with text "Before unload" appeared.', 0);
+                    errorInEachBrowserContains(errs,
+                        ' 53 |    await t ' +
+                        '54 |        .click(\'#enableBeforeUnload\') ' +
+                        '> 55 |        .click(\'#linkToThisPage\'); ',
+                        0);
+                });
+        });
     });
 
-    it("Should fail if the expected confirm dialog doesn't appear after an action", function () {
-        return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after an action',
-            { shouldFail: true })
-            .catch(function (errs) {
-                console.log(errs);
-                errorInEachBrowserContains(errs, 'The expected system confirm dialog did not appear.', 0);
-                errorInEachBrowserContains(errs, ' > 36 |        .handleConfirm(true);', 0);
-            });
+    describe('Dialogs sequence', function () {
+        it('Should pass if dialogs sequence appears after an action', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialogs sequence appears after an action');
+        });
+
+        it("Should fail if the expected prompt dialog doesn't appear after an action", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected prompt in dialogs sequence after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'The expected system prompt dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        '73 |    await t ' +
+                        '74 |        .click(\'#buttonAlertConfirm\') ' +
+                        '75 |        .handleAlert() ' +
+                        '76 |        .handleConfirm(true) ' +
+                        '> 77 |        .handlePrompt(null);',
+                        0);
+                });
+        });
+
+        it('Should fail when an unexpected confirm dialog appears after an action', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm in dialogs sequence after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
+                    errorInEachBrowserContains(errs,
+                        '81 |    await t ' +
+                        '> 82 |        .click(\'#buttonDialogsSequence\') ' +
+                        '83 |        .handleAlert() ' +
+                        '84 |        .handlePrompt();',
+                        0);
+                });
+        });
     });
 
-    it('Should fail when an unexpected confirm dialog appears after an action', function () {
-        return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm after an action',
-            { shouldFail: true })
-            .catch(function (errs) {
-                console.log(errs);
-                errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
-                errorInEachBrowserContains(errs, '> 41 |        .click(\'#buttonConfirm\'); ', 0);
-            });
-    });
 
-    it('Should pass if the expected confirm dialog appears after page load', function () {
+    /*it('Should pass if the expected confirm dialog appears after page load', function () {
         return runTests('./testcafe-fixtures/confirm-page-test.js', 'Expected confirm after page load');
     });
 
@@ -48,140 +177,13 @@ describe('Native dialogs handling222', function () {
                 errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
                 errorInEachBrowserContains(errs, ' > 12 |    await t.click(\'body\');', 0);
             });
-    });
+    });*/
 });
 
 /*var expect = require('chai').expect;
 
 
 describe('Native dialogs handling', function () {
-    describe('Errors during dialogs handling', function () {
-        it("Should fail if the expected alert dialog doesn't appear after an action", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected alert after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system alert dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 12 |        .click(\'#withoutDialog\', { ' +
-                        '13 |            handleDialogs: { alert: true } ' +
-                        '14 |        });'
-                    );
-                });
-        });
-
-        it('Should fail when an unexpected alert dialog appears after an action', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected alert after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('Unexpected system alert dialog with text "Alert!" appeared.');
-                    expect(errs[0]).contains('> 19 |        .click(\'#buttonAlert\');');
-                });
-        });
-
-        it("Should fail if the expected confirm dialog doesn't appear after an action", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system confirm dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 25 |        .click(\'#withoutDialog\', { ' +
-                        '26 |            handleDialogs: { confirm: { result: true } } ' +
-                        '27 |        });'
-                    );
-                });
-        });
-
-        it('Should fail when an unexpected confirm dialog appears after an action', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('Unexpected system confirm dialog with text "Confirm?" appeared.');
-                    expect(errs[0]).contains('> 32 |        .click(\'#buttonConfirm\');');
-                });
-        });
-
-        it("Should fail if the expected prompt dialog doesn't appear after an action", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected prompt after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system prompt dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 38 |        .click(\'#withoutDialog\', { ' +
-                        '39 |            handleDialogs: { ' +
-                        '40 |                prompt: { result: \'text\' } ' +
-                        '41 |            } ' +
-                        '42 |        })'
-                    );
-                });
-        });
-
-        it('Should fail when an unexpected prompt dialog appears after an action', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected prompt after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('Unexpected system prompt dialog with text "Prompt:" appeared.');
-                    expect(errs[0]).contains('> 47 |        .click(\'#buttonPrompt\');');
-                });
-        });
-
-        it("Should fail if the expected beforeUnload dialog doesn't appear after an action", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected beforeUnload after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system beforeUnload dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 200 |        .click(\'#linkToThisPage\', { ' +
-                        '201 |            handleDialogs: { beforeUnload: true } ' +
-                        '202 |        });'
-                    );
-                });
-        });
-
-        it('Should fail when an unexpected beforeUnload dialog appears after an action', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected beforeUnload after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('Unexpected system beforeUnload dialog with text "Before unload" appeared.');
-                    expect(errs[0]).contains('> 208 |        .click(\'#linkToThisPage\'); ');
-                });
-        });
-    });
-
-    describe('Dialogs sequence', function () {
-        it('Should pass if dialogs sequence appears after an action', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialogs sequence appears after an action');
-        });
-
-        it("Should fail if the expected prompt dialog doesn't appear after an action", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected prompt in dialogs sequence after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system prompt dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 64 |        .click(\'#buttonDialogsSequence\', { ' +
-                        '65 |            handleDialogs: { ' +
-                        '66 |                confirm: { result: true }, ' +
-                        '67 |                alert:   true, ' +
-                        '68 |                prompt:  { result: null } ' +
-                        '69 |            }'
-                    );
-                });
-        });
-
-        it('Should fail when an unexpected confirm dialog appears after an action', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm in dialogs sequence after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('Unexpected system confirm dialog with text "Confirm?" appeared.');
-                    expect(errs[0]).contains(
-                        '> 75 |        .click(\'#buttonDialogsSequence\', { ' +
-                        '76 |            handleDialogs: { alert: true } ' +
-                        '77 |        });'
-                    );
-                });
-        });
-    });
-
     describe('Dialog appears after timeout', function () {
         it("Should pass if the timeout for waiting dialog exceeds time required for the dialogs to appear", function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialog alert appears with some timeout after an action',
@@ -314,7 +316,7 @@ describe('Native dialogs handling', function () {
                 return runTests('./testcafe-fixtures/different-actions-test.js', 'Dialog appears during resizeWindow action')
             });
 
-            it.only("Should fail if the expected alert dialog doesn't appear during resizeWindow action", function () {
+            it("Should fail if the expected alert dialog doesn't appear during resizeWindow action", function () {
                 return runTests('./testcafe-fixtures/different-actions-test.js', 'No expected alert during resizeWindow action',
                     { shouldFail: true })
                     .catch(function (errs) {

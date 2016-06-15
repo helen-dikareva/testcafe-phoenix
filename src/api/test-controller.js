@@ -24,7 +24,10 @@ import {
     TakeScreenshotCommand,
     ResizeWindowCommand,
     ResizeWindowToFitDeviceCommand,
+    HandleAlertCommand,
     HandleConfirmCommand,
+    HandlePromptCommand,
+    HandleBeforeUnloadCommand,
     isHandleCommand
 } from '../test-run/commands';
 
@@ -103,7 +106,6 @@ export default class TestController {
             throw err;
         }
 
-        debugger;
         if (isHandleCommand(command)) {
             this.executionChain = this.notHandleExecutionChain.then(() => {
                 debugger;
@@ -218,9 +220,20 @@ export default class TestController {
         return this._enqueueAction('resizeWindowToFitDevice', ResizeWindowToFitDeviceCommand, { device, portrait });
     }
 
+    _handleAlert$ () {
+        return this._enqueueAction('handleAlert', HandleAlertCommand);
+    }
+
     _handleConfirm$ (result) {
-        debugger;
         return this._enqueueAction('handleConfirm', HandleConfirmCommand, { result });
+    }
+
+    _handlePrompt$ (result) {
+        return this._enqueueAction('handlePrompt', HandlePromptCommand, { result });
+    }
+
+    _handleBeforeUnload$ () {
+        return this._enqueueAction('handleBeforeUnload', HandleBeforeUnloadCommand);
     }
 
     _eval$ (fn, dependencies) {

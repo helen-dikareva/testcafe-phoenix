@@ -139,6 +139,11 @@ function stringOrStringArrayArgument (argument, val) {
         throw new ActionStringOrStringArrayArgumentError(argument, type);
 }
 
+function stringOrNull (argument, val) {
+    if (val !== null)
+        stringOrStringArrayArgument(argument, val);
+}
+
 // Initializers
 function initSelector (val) {
     return `(function () { return document.querySelector('${val}') })()`;
@@ -571,6 +576,29 @@ export class HandleConfirmCommand extends Assignable {
     }
 }
 
+export class HandlePromptCommand extends Assignable {
+    constructor (obj) {
+        super(obj);
+
+        this.type   = TYPE.handlePrompt;
+        this.result = null;
+
+        this._assignFrom(obj, true);
+    }
+
+    _getAssignableProperties () {
+        return [
+            { name: 'result', type: stringOrNull }
+        ];
+    }
+}
+
+export class HandleBeforeUnloadCommand {
+    constructor () {
+        this.type = TYPE.handleBeforeUnload;
+    }
+}
+
 export class TestDoneCommand {
     constructor () {
         this.type = TYPE.testDone;
@@ -640,8 +668,14 @@ export function createCommandFromObject (obj) {
         case TYPE.resizeWindowToFitDevice:
             return new ResizeWindowToFitDeviceCommand(obj);
 
+        case TYPE.handleAlert:
+            return new HandleAlertCommand();
+
         case TYPE.handleConfirm:
             return new HandleConfirmCommand(obj);
+
+        case TYPE.handlePrompt:
+            return new HandlePromptCommand(obj);
 
         case TYPE.testDone:
             return new TestDoneCommand();
@@ -672,7 +706,8 @@ export function isServiceCommand (command) {
            command.type === TYPE.prepareBrowserManipulation;
 }
 
-export function isHandleCommand(command){
-    return command.type === TYPE.handleConfirm;
+export function isHandleCommand (command) {
+    return command.type === TYPE.handleAlert || command.type === TYPE.handleConfirm ||
+           command.type === TYPE.handlePrompt || command.type === TYPE.handleBeforeUnload;
 }
 

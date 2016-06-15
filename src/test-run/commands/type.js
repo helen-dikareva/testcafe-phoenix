@@ -28,5 +28,7 @@ export default {
     resizeWindowToFitDevice:    'resize-window-to-fit-device',
     handleAlert:                'handle-alert',
     handleConfirm:              'handle-confirm',
+    handlePrompt:               'handle-prompt',
+    handleBeforeUnload:         'handle-before-unload',
     testDone:                   'test-done'
 };
