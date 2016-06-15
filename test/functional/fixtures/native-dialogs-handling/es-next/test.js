@@ -1,11 +1,7 @@
 var errorInEachBrowserContains = require('../../../assertion-helper.js').errorInEachBrowserContains;
 
 
-describe('[ES-NEXT] Native dialogs handling', function () {
-    /*   it('Should pass if the expected confirm dialog appears after an action', function () {
-           return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected confirm after an action');
-       });*/
-
+describe.only('[ES-NEXT] Native dialogs handling', function () {
     describe('Errors during dialogs handling', function () {
         it("Should fail if the expected alert dialog doesn't appear after an action", function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected alert after an action',
@@ -154,6 +150,20 @@ describe('[ES-NEXT] Native dialogs handling', function () {
         });
     });
 
+    describe('Dialog appears after timeout', function () {
+        it("Should pass if the timeout for waiting dialog exceeds time required for the dialogs to appear", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialog alert appears with some timeout after redirect',
+                { elementAvailabilityTimeout: 1500 });
+        });
+
+        it('Should fail if the timeout for waiting dialog is less than time required for the dialog to appear', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialog alert appears with some timeout after an action',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    errorInEachBrowserContains(errs, 'The expected system alert dialog did not appear.', 0);
+                });
+        });
+    });
 
     /*it('Should pass if the expected confirm dialog appears after page load', function () {
         return runTests('./testcafe-fixtures/confirm-page-test.js', 'Expected confirm after page load');
@@ -184,25 +194,7 @@ describe('[ES-NEXT] Native dialogs handling', function () {
 
 
 describe('Native dialogs handling', function () {
-    describe('Dialog appears after timeout', function () {
-        it("Should pass if the timeout for waiting dialog exceeds time required for the dialogs to appear", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialog alert appears with some timeout after an action',
-                { elementAvailabilityTimeout: 1500 });
-        });
 
-        it('Should fail if the timeout for waiting dialog is less than time required for the dialog to appear', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialog alert appears with some timeout after an action',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system alert dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 83 |        .click(\'#buttonDialogAfterTimeout\', { ' +
-                        '84 |            handleDialogs: { alert: true } ' +
-                        '85 |        });'
-                    );
-                });
-        });
-    });
 
     describe('Dialogs appear after redirect', function () {
         it('Should handle confirm dialogs', function () {

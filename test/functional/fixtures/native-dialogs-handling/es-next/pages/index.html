@@ -12,9 +12,9 @@
 <button id="buttonAllDialogsSequence">AllDialogsSequence</button>
 <button id="buttonAlertConfirm">AllDialogsSequence</button>
 <button id="buttonDialogsSequence">DialogsSequence</button>
+<button id="buttonDialogAfterTimeoutWithRedirect">DialogAfterTimeoutWithRedirect</button>
 <button id="buttonDialogAfterTimeout">DialogAfterTimeout</button>
 <button id="buttonRedirect">RedirectBetweenDialogs</button>
-
 <button id="enableBeforeUnload">EnableBeforeUnload</button>
 
 <a id="linkToConfirmPage" href="confirm.html">Confirm page</a>
@@ -56,6 +56,12 @@
         alert('Alert!');
         confirm('Confirm?');
         prompt('Prompt:', 'defaultText');
+    });
+
+    document.getElementById('buttonDialogAfterTimeoutWithRedirect').addEventListener('click', function () {
+        window.setTimeout(function () {
+            document.location.href = 'http://localhost:3000/native-dialogs-handling/es-next/pages/dialog-with-timeout.html'
+        }, 1000);
     });
 
     document.getElementById('buttonDialogAfterTimeout').addEventListener('click', function () {

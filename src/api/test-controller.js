@@ -108,7 +108,6 @@ export default class TestController {
 
         if (isHandleCommand(command)) {
             this.executionChain = this.notHandleExecutionChain.then(() => {
-                debugger;
                 return this.testRun.executeCommand(command, callsite)
             });
         }
@@ -116,7 +115,6 @@ export default class TestController {
             this.notHandleExecutionChain = this.executionChain;
 
             this.executionChain = this.executionChain.then(() => {
-                debugger;
                 return this.testRun.executeCommand(command, callsite)
             });
         }

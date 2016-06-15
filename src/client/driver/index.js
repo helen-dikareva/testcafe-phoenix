@@ -219,10 +219,17 @@ export default class ClientDriver {
     }
 
     _onHandleDialogCommand (command) {
-        this._onReady(new DriverStatus({
-            isCommandResult: true,
-            executionError:  this.nativeDialogsMonitor.checkDialogsErrors(command.type.replace(/handle|-/g, ''))
-        }));
+        var dialogType = command.type.replace(/handle|-/g, '');
+        var error      = this.nativeDialogsMonitor.checkDialogsErrors(dialogType);
+
+        if (!error) {
+            this._onReady(new DriverStatus({ isCommandResult: true }));
+            return;
+        }
+
+        this.nativeDialogsMonitor
+            .waitForDialog(dialogType, this.elementAvailabilityTimeout)
+            .then(err => this._onReady(new DriverStatus({ isCommandResult: true, executionError: err })))
     }
 
     _onCommand (command) {

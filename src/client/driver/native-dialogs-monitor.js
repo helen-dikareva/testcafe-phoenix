@@ -46,11 +46,6 @@ export default class NativeDialogsMonitor extends EventEmitter {
         }
     }
 
-    _checkExpectedDialogs (type) {
-        if (this._findDialog(type))
-            return new WasNotExpectedDialogError(type);
-    }
-
     init (initialDialogsInfo, errorHandler) {
         if (initialDialogsInfo && initialDialogsInfo.length)
             this.setExpectedDialogs(initialDialogsInfo);
@@ -146,13 +141,20 @@ export default class NativeDialogsMonitor extends EventEmitter {
         this.contextStorage.setItem(NATIVE_DIALOGS_INFO_FLAG, dialogInfo);
     }
 
-    checkDialogsErrors (type, timeout) {
-        var dialogInfo = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG);
+    checkDialogsErrors (type) {
+        if (this._findDialog(type))
+            return new WasNotExpectedDialogError(type);
+    }
 
-        if (!dialogInfo)
-            return timeout ? Promise.resolve(null) : null;
+    waitForDialog (type, timeout) {
+        var expectedDialog = null;
+        
+        return waitFor(() => {
+            expectedDialog = this._findDialog(type);
 
-
-        return timeout ? this._waitForExpectedDialogs(timeout) : this._checkExpectedDialogs(type);
+            return expectedDialog ? false : true;
+        }, CHECK_DIALOGS_DELAY, timeout)
+            .then(() => null)
+            .catch(() => new WasNotExpectedDialogError(type));
     }
 }

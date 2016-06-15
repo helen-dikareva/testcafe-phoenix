@@ -91,15 +91,20 @@ test('No expected confirm after page load', async t => {
         .click('#withoutDialog');
 });
 
-/*
 //Timeout after action
-test('Dialog alert appears with some timeout after an action', async t => {
+test('Dialog alert appears with some timeout after redirect', async t => {
     await t
-        .click('#buttonDialogAfterTimeout', {
-            handleDialogs: { alert: true }
-        });
+        .click('#buttonDialogAfterTimeoutWithRedirect')
+        .handleAlert();
 });
 
+test('Dialog alert appears with some timeout after an action', async t => {
+    await t
+        .click('#buttonDialogAfterTimeout')
+        .handleAlert();
+});
+
+/*
 // Dialogs after page redirect
 test('Expected confirm after redirect', async t => {
     await t
