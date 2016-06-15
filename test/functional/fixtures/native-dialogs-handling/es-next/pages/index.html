@@ -14,7 +14,8 @@
 <button id="buttonDialogsSequence">DialogsSequence</button>
 <button id="buttonDialogAfterTimeoutWithRedirect">DialogAfterTimeoutWithRedirect</button>
 <button id="buttonDialogAfterTimeout">DialogAfterTimeout</button>
-<button id="buttonRedirect">RedirectBetweenDialogs</button>
+<button id="buttonRedirectConfirm">RedirectConfirm</button>
+<button id="buttonRedirectPrompt">RedirectPrompt</button>
 <button id="enableBeforeUnload">EnableBeforeUnload</button>
 
 <a id="linkToConfirmPage" href="confirm.html">Confirm page</a>
@@ -40,7 +41,7 @@
     document.getElementById('buttonAllDialogsSequence').addEventListener('click', function () {
         alert('Alert!');
         alert('Alert!');
-        confirm('Confirm?');
+        document.getElementById('result').textContent = window.confirm('Confirm?');
         confirm('Confirm?');
         prompt('Prompt:', 'defaultText');
         prompt('Prompt:', 'defaultText');
@@ -70,10 +71,16 @@
         }, 1000);
     });
 
-    document.getElementById('buttonRedirect').addEventListener('mousedown', function () {
+    document.getElementById('buttonRedirectConfirm').addEventListener('mousedown', function () {
         alert('Alert!');
 
         document.location.href = 'http://localhost:3000/native-dialogs-handling/es-next/pages/confirm.html'
+    });
+
+    document.getElementById('buttonRedirectPrompt').addEventListener('mousedown', function () {
+        alert('Alert!');
+
+        document.location.href = 'http://localhost:3000/native-dialogs-handling/es-next/pages/prompt.html'
     });
 
     document.getElementById('enableBeforeUnload').addEventListener('click', function () {

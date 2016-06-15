@@ -104,70 +104,45 @@ test('Dialog alert appears with some timeout after an action', async t => {
         .handleAlert();
 });
 
-/*
 // Dialogs after page redirect
-test('Expected confirm after redirect', async t => {
+test('Expected alert and confirm after redirect', async t => {
     await t
-        .click('#linkToConfirmPage', {
-            handleDialogs: { confirm: { result: true } }
-        });
+        .click('#buttonRedirectConfirm')
+        .handleAlert()
+        .handleConfirm(true);
 
     expect(await getResult()).equals('true');
 
-    await t
-        .navigateTo('index.html')
-        .click('#linkToConfirmPage', {
-            handleDialogs: { confirm: { result: false } }
-        });
+    await t.navigateTo('index.html');
+
+    await t.click('#buttonRedirectConfirm')
+        .handleAlert()
+        .handleConfirm(false);
 
     expect(await getResult()).equals('false');
 });
 
-test('Expected prompt after redirect', async t => {
+test('Expected alert and prompt after redirect', async t => {
     await t
-        .click('#linkToPromptPage', {
-            handleDialogs: { prompt: { result: 'prompt result' } }
-        });
+        .click('#buttonRedirectPrompt')
+        .handleAlert()
+        .handlePrompt('prompt result');
 
     expect(await getResult()).equals('prompt result');
 
-    await t
-        .navigateTo('index.html')
-        .click('#linkToPromptPage', {
-            handleDialogs: { prompt: { result: null } }
-        });
+    await t.navigateTo('index.html');
+
+    await t.click('#buttonRedirectPrompt')
+        .handleAlert()
+        .handlePrompt(null);
 
     expect(await getResult()).equals('null');
 });
 
-test('Handle dialog confirm with false value after page redirect', async t => {
-    await t
-        .click('#linkToConfirmPage', {
-            handleDialogs: { confirm: { result: false } }
-        });
-
-    expect(await getResult()).equals('false');
-});
-
-test('Expected dialogs before and after redirect', async t => {
-    await t
-        .click('#enableBeforeUnload')
-        .click('#buttonRedirect', {
-            handleDialogs: {
-                alert:        true,
-                confirm:      { result: false },
-                beforeUnload: true
-            }
-        });
-
-    expect(await getResult()).equals('false');
-});
-
 test('No expected confirm after redirect', async t => {
     await t
-        .click('#linkToThisPage', {
-            handleDialogs: { confirm: { result: true } }
-        });
+        .click('#linkToThisPage')
+        .handleConfirm(true);
 });
 
 test('Unexpected confirm after redirect', async t => {
@@ -175,7 +150,7 @@ test('Unexpected confirm after redirect', async t => {
 });
 
 //Dialog during page loading
-test('Dialogs appear during page loading', async t => {
+/*test('Dialogs appear during page loading', async t => {
     await t
         .navigateTo('page-load.html', {
             handleDialogs: {

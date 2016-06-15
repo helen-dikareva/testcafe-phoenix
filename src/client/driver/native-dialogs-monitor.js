@@ -21,22 +21,6 @@ export default class NativeDialogsMonitor extends EventEmitter {
         this.unexpectedDialogErrorHandler = null;
     }
 
-    _waitForExpectedDialogs (timeout) {
-        debugger;
-        var dialogWithError = this._checkExpectedDialogs();
-
-        if (!dialogWithError)
-            return Promise.resolve(null);
-
-        return waitFor(() => {
-            dialogWithError = this._checkExpectedDialogs();
-
-            return dialogWithError ? false : true;
-        }, CHECK_DIALOGS_DELAY, timeout)
-            .then(() => null)
-            .catch(() => new WasNotExpectedDialogError(dialogWithError));
-    }
-
     _findDialog (type) {
         var dialogInfo = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
 
@@ -74,7 +58,6 @@ export default class NativeDialogsMonitor extends EventEmitter {
         });
 
         window.alert = text => {
-            debugger;
             var dialogType     = 'alert';
             var dialogsInfo    = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
             var expectedDialog = dialogsInfo.expectedDialogs.shift();
@@ -92,7 +75,6 @@ export default class NativeDialogsMonitor extends EventEmitter {
         };
 
         window.confirm = text => {
-            debugger;
             var dialogType     = 'confirm';
             var dialogsInfo    = this.contextStorage.getItem(NATIVE_DIALOGS_INFO_FLAG) || DEFAULT_DIALOGS_INFO;
             var expectedDialog = dialogsInfo.expectedDialogs.shift();

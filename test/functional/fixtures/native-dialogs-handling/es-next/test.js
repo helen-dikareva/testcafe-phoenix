@@ -1,7 +1,7 @@
 var errorInEachBrowserContains = require('../../../assertion-helper.js').errorInEachBrowserContains;
 
 
-describe.only('[ES-NEXT] Native dialogs handling', function () {
+describe('[ES-NEXT] Native dialogs handling', function () {
     describe('Errors during dialogs handling', function () {
         it("Should fail if the expected alert dialog doesn't appear after an action", function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected alert after an action',
@@ -165,6 +165,32 @@ describe.only('[ES-NEXT] Native dialogs handling', function () {
         });
     });
 
+    describe('Dialogs appear after redirect', function () {
+        it('Should handle confirm dialogs', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected alert and confirm after redirect');
+        });
+
+        it('Should handle prompt dialogs', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected alert and prompt after redirect');
+        });
+
+        it("Should fail if the expected confirm dialog doesn't appear", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after redirect',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    errorInEachBrowserContains(errs, 'The expected system confirm dialog did not appear.', 0);
+                });
+        });
+
+        it('Should fail when an unexpected confirmation dialog appears', function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm after redirect',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
+                });
+        });
+    });
+
     /*it('Should pass if the expected confirm dialog appears after page load', function () {
         return runTests('./testcafe-fixtures/confirm-page-test.js', 'Expected confirm after page load');
     });
@@ -197,39 +223,8 @@ describe('Native dialogs handling', function () {
 
 
     describe('Dialogs appear after redirect', function () {
-        it('Should handle confirm dialogs', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected confirm after redirect');
-        });
 
-        it('Should handle prompt dialogs', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected prompt after redirect');
-        });
 
-        it('Should handle dialogs before and after redirect', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Expected dialogs before and after redirect');
-        });
-
-        it("Should fail if the expected confirm dialog doesn't appear", function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after redirect',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('The expected system confirm dialog did not appear.');
-                    expect(errs[0]).contains(
-                        '> 148 |        .click(\'#linkToThisPage\', { ' +
-                        '149 |            handleDialogs: { confirm: { result: true } } ' +
-                        '150 |        });'
-                    );
-                });
-        });
-
-        it('Should fail when an unexpected confirmation dialog appears', function () {
-            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm after redirect',
-                { shouldFail: true })
-                .catch(function (errs) {
-                    expect(errs[0]).contains('Unexpected system confirm dialog with text "Confirm?" appeared.');
-                    expect(errs[0]).contains('> 154 |    await t.click(\'#linkToConfirmPage\');')
-                });
-        });
     });
 
     describe('Dialogs appear during page loading', function () {
