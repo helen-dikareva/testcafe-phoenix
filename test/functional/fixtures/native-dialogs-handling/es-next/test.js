@@ -1,7 +1,7 @@
 var errorInEachBrowserContains = require('../../../assertion-helper.js').errorInEachBrowserContains;
 
 
-describe('[ES-NEXT] Native dialogs handling', function () {
+describe.only('[ES-NEXT] Native dialogs handling', function () {
     describe('Errors during dialogs handling', function () {
         it("Should fail if the expected alert dialog doesn't appear after an action", function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected alert after an action',
@@ -160,7 +160,13 @@ describe('[ES-NEXT] Native dialogs handling', function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Dialog alert appears with some timeout after an action',
                 { shouldFail: true })
                 .catch(function (errs) {
+                    console.log(errs);
                     errorInEachBrowserContains(errs, 'The expected system alert dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        '102 |    await t ' +
+                        '103 |        .click(\'#buttonDialogAfterTimeout\') ' +
+                        '> 104 |        .handleAlert();',
+                        0);
                 });
         });
     });
@@ -178,7 +184,13 @@ describe('[ES-NEXT] Native dialogs handling', function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after redirect',
                 { shouldFail: true })
                 .catch(function (errs) {
+                    console.log(errs);
                     errorInEachBrowserContains(errs, 'The expected system confirm dialog did not appear.', 0);
+                    errorInEachBrowserContains(errs,
+                        '143 |    await t ' +
+                        '144 |        .click(\'#linkToThisPage\') ' +
+                        '> 145 |        .handleConfirm(true);',
+                        0);
                 });
         });
 
@@ -186,34 +198,36 @@ describe('[ES-NEXT] Native dialogs handling', function () {
             return runTests('./testcafe-fixtures/native-dialogs-test.js', 'Unexpected confirm after redirect',
                 { shouldFail: true })
                 .catch(function (errs) {
+                    console.log(errs);
                     errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
+                    errorInEachBrowserContains(errs, '> 149 |    await t.click(\'#linkToConfirmPage\');', 0);
                 });
         });
     });
 
-    /*it('Should pass if the expected confirm dialog appears after page load', function () {
-        return runTests('./testcafe-fixtures/confirm-page-test.js', 'Expected confirm after page load');
-    });
+    describe('Dailogs appear after page load', function () {
+        it('Should pass if the expected confirm dialog appears after page load', function () {
+            return runTests('./testcafe-fixtures/confirm-page-test.js', 'Expected confirm after page load');
+        });
 
-    it("Should fail if the expected confirm dialog doesn't appear after page load", function () {
-        return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after page load',
-            { shouldFail: true })
-            .catch(function (errs) {
-                console.log(errs);
-                errorInEachBrowserContains(errs, 'The expected system confirm dialog did not appear.', 0);
-                errorInEachBrowserContains(errs, '> 46 |        .handleConfirm(true) ', 0);
-            });
-    });
+        it("Should fail if the expected confirm dialog doesn't appear after page load", function () {
+            return runTests('./testcafe-fixtures/native-dialogs-test.js', 'No expected confirm after page load',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'The expected system confirm dialog did not appear.', 0);
+                });
+        });
 
-    it('Should fail when an unexpected confirm dialog appears after page load', function () {
-        return runTests('./testcafe-fixtures/confirm-page-test.js', 'Unexpected confirm after page load',
-            { shouldFail: true })
-            .catch(function (errs) {
-                console.log(errs);
-                errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
-                errorInEachBrowserContains(errs, ' > 12 |    await t.click(\'body\');', 0);
-            });
-    });*/
+        it('Should fail when an unexpected confirm dialog appears after page load', function () {
+            return runTests('./testcafe-fixtures/confirm-page-test.js', 'Unexpected confirm after page load',
+                { shouldFail: true })
+                .catch(function (errs) {
+                    console.log(errs);
+                    errorInEachBrowserContains(errs, 'Unexpected system confirm dialog with text "Confirm?" appeared.', 0);
+                });
+        });
+    });
 });
 
 /*var expect = require('chai').expect;

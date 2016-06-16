@@ -44,6 +44,8 @@ export default class ClientDriver {
         this.initialDialogsInfo         = initialDialogsInfo;
         this.contextStorage             = new ContextStorage(window, testRunId);
         this.beforeUnloadRaised         = false;
+        this.documentReady              = false;
+        this.dialogError                = null;
 
         this.pageInitialRequestBarrier = new RequestBarrier();
 
@@ -64,7 +66,23 @@ export default class ClientDriver {
         browser.startHeartbeat(this.heartbeatUrl, hammerhead.createNativeXHR);
 
         modalBackground.initAndShowLoadingText();
-        this.readyPromise.then(() => modalBackground.hide());
+
+        this.readyPromise.then(() => {
+            modalBackground.hide();
+            this.documentReady = true;
+
+            debugger;
+            var inCommandExecution = this.contextStorage.getItem(COMMAND_EXECUTING_FLAG);
+            var status             = pendingStatus || new DriverStatus({
+                    isCommandResult: inCommandExecution,
+                    executionError:  this.dialogError
+                });
+
+            if (inCommandExecution)
+                this._onReady(status);
+            else if (this.dialogError)
+                this._onReady(new DriverStatus({ isCommandResult: true, executionError: this.dialogError }))
+        });
 
         var pendingStatus = this.contextStorage.getItem(PENDING_STATUS);
 
@@ -93,24 +111,20 @@ export default class ClientDriver {
         }
 
         this.nativeDialogsMonitor.init(this.initialDialogsInfo, err => {
-            this._onReady(new DriverStatus({ isCommandResult: true, executionError: err }))
+            debugger;
+            if (!this.documentReady)
+                this.dialogError = err;
+            else
+                this._onReady(new DriverStatus({ isCommandResult: true, executionError: err }))
         });
 
 
         var inCommandExecution = this.contextStorage.getItem(COMMAND_EXECUTING_FLAG);
+        var status             = pendingStatus || new DriverStatus({ isCommandResult: inCommandExecution });
 
-        modalBackground.hide();
-
-        var status = pendingStatus || new DriverStatus({ isCommandResult: inCommandExecution });
-        //TODO: add waiting after redirect
-        /*var dialogError = this.nativeDialogsMonitor.checkDialogsErrors();
-
-        // NOTE: we should think that native dialogs error is page error if we don't have command for execution.
-        // It can happens if dialog raised on first page load (test without using 'navigateTo' action)
-        if (dialogError)
-            status[inCommandExecution ? 'executionError' : 'pageError'] = dialogError;*/
-
-        this._onReady(status);
+        debugger;
+        if (!inCommandExecution)
+            this._onReady(status);
     }
 
     _onJsError (err) {
@@ -233,12 +247,11 @@ export default class ClientDriver {
     }
 
     _onCommand (command) {
-        debugger;
         this.readyPromise
             .then(() => {
+                debugger;
                 if (command.type === COMMAND_TYPE.testDone)
                     this._onTestDone();
-
 
                 else if (command.type === COMMAND_TYPE.executeClientFunction)
                     this._onExecuteClientFunctionCommand(command);
