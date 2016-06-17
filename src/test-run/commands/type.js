@@ -28,5 +28,9 @@ export default {
     resizeWindowToFitDevice:    'resize-window-to-fit-device',
     switchToIframe:             'switch-to-iframe',
     switchToMainWindow:         'switch-to-main-window',
+    handleAlert:                'handle-alert',
+    handleConfirm:              'handle-confirm',
+    handlePrompt:               'handle-prompt',
+    handleBeforeUnload:         'handle-before-unload',
     testDone:                   'test-done'
 };

@@ -10,6 +10,7 @@ import BrowserManipulationManager from './browser-manipulation-manager';
 import CLIENT_MESSAGES from './client-messages';
 import STATE from './state';
 import COMMAND_TYPE from './commands/type';
+import { ExpectedDialog } from './browser-dialogs';
 
 import { TakeScreenshotOnFailCommand } from './commands/window-manipulation';
 
@@ -21,7 +22,9 @@ import {
 import {
     isCommandRejectableByPageError,
     isBrowserManipulationCommand,
-    isServiceCommand
+    isServiceCommand,
+    isHandleDialogCommand,
+    isObservationCommand
 } from './commands/utils';
 
 //Const
@@ -29,6 +32,9 @@ const TEST_RUN_TEMPLATE               = read('../client/test-run/index.js.mustac
 const IFRAME_TEST_RUN_TEMPLATE        = read('../client/test-run/iframe.js.mustache');
 const TEST_DONE_CONFIRMATION_RESPONSE = 'test-done-confirmation';
 const MAX_RESPONSE_DELAY              = 2 * 60 * 1000;
+
+
+var nextTick = () => new Promise(resolve => setTimeout(resolve, 0));
 
 
 export default class TestRun extends Session {
@@ -45,9 +51,11 @@ export default class TestRun extends Session {
         this.running = false;
         this.state   = STATE.initial;
 
-        this.driverTaskQueue          = [];
-        this.browserManipulationQueue = [];
-        this.testDoneCommandQueued    = false;
+        this.driverTaskQueue            = [];
+        this.browserManipulationQueue   = [];
+        this.inCommandExecutionOnServer = false;
+        this.testDoneCommandQueued      = false;
+        this.initialDialogs             = [];
 
         this.pendingRequest   = null;
         this.pendingPageError = null;
@@ -63,16 +71,23 @@ export default class TestRun extends Session {
         this.errs                     = [];
         this.lastDriverStatusId       = null;
         this.lastDriverStatusResponse = null;
+
+        this._start();
     }
 
 
     // Hammerhead payload
     _getPayloadScript () {
+        var initialDialogs = this.running ? null : this.initialDialogs;
+
+        this.running = true;
+
         return Mustache.render(TEST_RUN_TEMPLATE, {
             testRunId:           this.id,
             browserHeartbeatUrl: this.browserConnection.heartbeatUrl,
             browserStatusUrl:    this.browserConnection.statusUrl,
-            selectorTimeout:     this.opts.selectorTimeout
+            selectorTimeout:     this.opts.selectorTimeout,
+            initialDialogs:      JSON.stringify(initialDialogs)
         });
     }
 
@@ -126,7 +141,6 @@ export default class TestRun extends Session {
 
         TestRun.activeTestRuns[this.id] = this;
 
-        this.running = true;
         this.emit('start');
 
         if (!beforeEachFn || await this._executeTestFn(STATE.inBeforeEach, beforeEachFn)) {
@@ -168,18 +182,79 @@ export default class TestRun extends Session {
 
 
     // Task queue
-    _enqueueCommand (command, callsite) {
-        if (this.pendingRequest)
-            this._resolvePendingRequest(command);
+    _getNextTaskCommand () {
+        if (this.currentDriverTask) {
+            if (this.currentDriverTask.executeOnServer) {
+                this.currentDriverTask.executeOnServer();
+                return null;
+            }
 
-        return new Promise((resolve, reject) => this.driverTaskQueue.push({ command, resolve, reject, callsite }));
+            return this.currentDriverTask.command;
+        }
+
+        return null;
     }
 
-    _removeAllNonServiceTasks () {
-        this.driverTaskQueue          = this.driverTaskQueue.filter(driverTask => isServiceCommand(driverTask.command));
+    _getExecuteOnServerMethod (command) {
+        return () => {
+            this.inCommandExecutionOnServer = true;
+
+            command
+                .execute()
+                .then(() => {
+                    this._fulfillCurrentDriverTask({});
+                    this.inCommandExecutionOnServer = false;
+
+                    var nextCommand = this._getNextTaskCommand();
+
+                    if (nextCommand && this.pendingRequest) {
+                        nextTick()
+                            .then(() => this._resolvePendingRequest(nextCommand));
+                    }
+                });
+        };
+    }
+
+    _enqueueCommand (command, callsite) {
+        var executeOnServer = null;
+
+        if (command.type === COMMAND_TYPE.wait)
+            executeOnServer = this._getExecuteOnServerMethod(command);
+
+        if (this.pendingRequest && !this.inCommandExecutionOnServer) {
+            if (executeOnServer)
+                executeOnServer();
+            else {
+                nextTick()
+                    .then(() => this._resolvePendingRequest(command));
+            }
+        }
+
+        return new Promise((resolve, reject) => this.driverTaskQueue.push({
+            command,
+            resolve,
+            reject,
+            callsite,
+            executeOnServer
+        }));
+    }
+
+    _removeAllNonServiceTasks (success, result) {
+        this.driverTaskQueue = this.driverTaskQueue.filter(driverTask => {
+            var isService = isServiceCommand(driverTask.command);
+
+            if (!isService) {
+                if (success)
+                    driverTask.resolve(result);
+                else
+                    driverTask.reject(result);
+            }
+
+            return isService;
+        });
+
         this.browserManipulationQueue = this.browserManipulationQueue.filter(manipulationTask => isServiceCommand(manipulationTask.command));
     }
-
 
     // Current driver task
     get currentDriverTask () {
@@ -191,14 +266,14 @@ export default class TestRun extends Session {
         this.driverTaskQueue.shift();
 
         if (this.testDoneCommandQueued)
-            this._removeAllNonServiceTasks();
+            this._removeAllNonServiceTasks(true, result);
     }
 
     _rejectCurrentDriverTask (err) {
         err.callsite = err.callsite || this.driverTaskQueue[0].callsite;
 
         this.currentDriverTask.reject(err);
-        this._removeAllNonServiceTasks();
+        this._removeAllNonServiceTasks(false, err);
     }
 
 
@@ -239,11 +314,7 @@ export default class TestRun extends Session {
     }
 
     _handleDriverRequest (driverStatus) {
-        if (!this.running)
-            this._start();
-
-        var pageError = this.pendingPageError || driverStatus.pageError;
-
+        var pageError                  = this.pendingPageError || driverStatus.pageError;
         var currentTaskRejectedByError = pageError && this._handlePageErrorStatus(pageError);
 
         if (!currentTaskRejectedByError && driverStatus.isCommandResult) {
@@ -256,10 +327,35 @@ export default class TestRun extends Session {
             this._fulfillCurrentDriverTask(driverStatus);
         }
 
-        return this.currentDriverTask ? this.currentDriverTask.command : null;
+        return this._getNextTaskCommand();
     }
 
     // Execute command
+    _enqueueHandleDialogCommand (handleDialogCommand) {
+        var dialogType     = handleDialogCommand.type.replace(/handle|-/g, '');
+        var dialog         = new ExpectedDialog(dialogType, handleDialogCommand.result);
+        var length         = this.driverTaskQueue.length;
+        var relatedCommand = null;
+        var curCommand     = null;
+
+        // NOTE: we should find command that causes appearance of native dialog to add information how to
+        // handle this dialog. If no such commands we think that first page loading causes native dialog.
+        // We save information about expected initial dialogs only before first page loading.
+        for (var i = length - 1; i >= 0; i--) {
+            curCommand = this.driverTaskQueue[i].command;
+
+            if (!isHandleDialogCommand(curCommand) && !isObservationCommand(curCommand)) {
+                relatedCommand = curCommand;
+                break;
+            }
+        }
+
+        if (relatedCommand)
+            relatedCommand.expectedDialogs.push(dialog);
+        else if (!this.running)
+            this.initialDialogs.push(dialog);
+    }
+
     executeCommand (command, callsite) {
         this.debugLog.command(command);
 
@@ -272,11 +368,11 @@ export default class TestRun extends Session {
             return this.executeCommand(new PrepareBrowserManipulationCommand(command.type), callsite);
         }
 
-        if (command.type === COMMAND_TYPE.wait)
-            return new Promise(resolve => setTimeout(resolve, command.timeout));
-
         if (command.type === COMMAND_TYPE.testDone)
             this.testDoneCommandQueued = true;
+
+        if (isHandleDialogCommand(command))
+            this._enqueueHandleDialogCommand(command);
 
         return this._enqueueCommand(command, callsite);
     }
