@@ -4,13 +4,15 @@ import ContextStorage from './storage';
 import DriverStatus from './status';
 import ParentDriverLink from './driver-link/parent';
 import { TYPE as MESSAGE_TYPE } from './driver-link/messages';
+import DialogsMonitor from './dialogs-monitor/child';
 
 
 export default class IframeDriver extends Driver {
-    constructor (testRunId, selectorTimeout) {
+    constructor (testRunId, selectorTimeout, initialDialogs) {
         super(testRunId, selectorTimeout);
 
         this.lastParentDriverMessageId = null;
+        this.initialDialogs            = initialDialogs;
         this.parentDriverLink          = new ParentDriverLink(window.parent);
         this._initParentDriverListening();
     }
@@ -40,6 +42,12 @@ export default class IframeDriver extends Driver {
                 this.parentDriverLink.confirmMessageReceived(msg.id);
                 this._onCommand(msg.command);
             }
+
+            if (msg.type === 'blah') {
+                debugger;
+                if (this.dialogsMonitor)
+                    this.dialogsMonitor.expectedDialogs = msg.expectedDialogs;
+            }
         });
     }
 
@@ -57,10 +65,17 @@ export default class IframeDriver extends Driver {
 
     // API
     start () {
+        debugger;
+        this.dialogsMonitor = new DialogsMonitor(this.initialDialogs);
+
         this.parentDriverLink
             .establishConnection()
-            .then(id => {
+            .then(response => {
+                var id = response.result.id;
+
                 this.contextStorage = new ContextStorage(window, id);
+
+                this.dialogsMonitor.expectedDialogs = response.expectedDialogs;
 
                 if (this._failIfClientCodeExecutionIsInterrupted())
                     return;

@@ -48,8 +48,9 @@ export default class TestRun extends Session {
         this.browserConnection          = browserConnection;
         this.browserManipulationManager = new BrowserManipulationManager(screenshotCapturer);
 
-        this.running = false;
-        this.state   = STATE.initial;
+        this.running         = false;
+        this.runningInIframe = false;
+        this.state           = STATE.initial;
 
         this.driverTaskQueue            = [];
         this.browserManipulationQueue   = [];
@@ -80,7 +81,7 @@ export default class TestRun extends Session {
     _getPayloadScript () {
         var initialDialogs = this.running ? null : this.initialDialogs;
 
-        this.running = true;
+        //this.running = true;
 
         return Mustache.render(TEST_RUN_TEMPLATE, {
             testRunId:           this.id,
@@ -92,9 +93,14 @@ export default class TestRun extends Session {
     }
 
     _getIframePayloadScript () {
+        var initialDialogs = this.runningInIframe ? null : this.initialDialogs;
+
+        this.runningInIframe = true;
+
         return Mustache.render(IFRAME_TEST_RUN_TEMPLATE, {
             testRunId:       this.id,
-            selectorTimeout: this.opts.selectorTimeout
+            selectorTimeout: this.opts.selectorTimeout,
+            initialDialogs:  JSON.stringify(initialDialogs)
         });
     }
 

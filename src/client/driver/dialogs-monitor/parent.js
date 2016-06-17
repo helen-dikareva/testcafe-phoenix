@@ -1,7 +1,9 @@
-import hammerhead from './deps/hammerhead';
-import { waitFor } from './deps/testcafe-core';
-import { TYPE as DIALOG_TYPE, AppearedDialog } from '../../test-run/browser-dialogs';
+import hammerhead from '../deps/hammerhead';
+import { waitFor } from '../deps/testcafe-core';
+import { TYPE as DIALOG_TYPE, AppearedDialog } from '../../../test-run/browser-dialogs';
 
+
+var messageSandbox = hammerhead.eventSandbox.message;
 
 const CHECK_DIALOGS_DELAY = 200;
 
@@ -18,6 +20,7 @@ export default class DialogsMonitor {
             this.expectedDialogs = expectedDialogs;
 
         this._init();
+        this._initChildListening();
     }
 
     get appearedDialogs () {
@@ -59,6 +62,7 @@ export default class DialogsMonitor {
     }
 
     _handleDialog (type, text) {
+        debugger;
         var dialog = new AppearedDialog(type, text);
 
         this.appearedDialogs.push(dialog);
@@ -87,6 +91,27 @@ export default class DialogsMonitor {
         window.alert   = text => this._handleDialog(DIALOG_TYPE.alert, text);
         window.confirm = text => this._handleDialog(DIALOG_TYPE.confirm, text);
         window.prompt  = text => this._handleDialog(DIALOG_TYPE.prompt, text);
+    }
+
+    _initChildListening(){
+        messageSandbox.on(hammerhead.eventSandbox.message.SERVICE_MSG_RECEIVED_EVENT, e => {
+            var msg = e.message;
+            var dialog = null;
+
+            if(msg.type === 'actual-dialog'){
+                debugger;
+                dialog = new AppearedDialog(msg.dialogType, msg.text);
+
+                this.appearedDialogs.push(dialog);
+            }
+
+            if(msg.type === 'unexpected-dialog'){
+                debugger;
+                dialog = new AppearedDialog(msg.dialogType, msg.text);
+
+                this.unexpectedAppearedDialog = dialog;
+            }
+        });
     }
 
     waitForDialog (timeout = DEFAULT_WAIT_FOR_DIALOG_TIMEOUT) {

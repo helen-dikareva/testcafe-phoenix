@@ -68,8 +68,10 @@ export default class ChildDriverLink {
             });
     }
 
-    confirmConnectionEstablished (requestMsgId) {
+    confirmConnectionEstablished (requestMsgId, expectedDialogs) {
         var msg = new ConfirmationMessage(requestMsgId, { id: this.driverId });
+        
+        msg.expectedDialogs = expectedDialogs;
 
         eventSandbox.message.sendServiceMsg(msg, this.driverWindow);
     }

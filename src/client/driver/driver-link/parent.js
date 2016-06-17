@@ -14,8 +14,7 @@ export default class ParentDriverLink {
     establishConnection () {
         var msg = new EstablishConnectionMessage();
 
-        return sendMessageToDriver(msg, this.driverWindow, WAIT_FOR_PARENT_DRIVER_RESPONSE_TIMEOUT, CurrentIframeIsNotLoadedError)
-            .then(response => response.result.id);
+        return sendMessageToDriver(msg, this.driverWindow, WAIT_FOR_PARENT_DRIVER_RESPONSE_TIMEOUT, CurrentIframeIsNotLoadedError);
     }
 
     confirmMessageReceived (requestMsgId) {

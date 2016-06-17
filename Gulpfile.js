@@ -435,11 +435,11 @@ function testFunctional (fixturesDir) {
         .pipe(mocha({
             ui:       'bdd',
             reporter: 'spec',
-            timeout:  typeof v8debug === 'undefined' ? 30000 : Infinity // NOTE: disable timeouts in debug
+            timeout:  typeof v8debug === 'undefined' ? Infinity : Infinity // NOTE: disable timeouts in debug
         }));
 }
 
-gulp.task('test-functional', ['build'], function () {
+gulp.task('test-functional', [/*'build'*/], function () {
     return testFunctional('test/functional/fixtures');
 });
 

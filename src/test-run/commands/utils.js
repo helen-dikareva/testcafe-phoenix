@@ -47,6 +47,7 @@ export function isHandleDialogCommand (command) {
 export function isExecutableInTopWindowOnly (command) {
     return command.type === TYPE.testDone ||
            command.type === TYPE.prepareBrowserManipulation ||
-           command.type === TYPE.switchToMainWindow;
+           command.type === TYPE.switchToMainWindow ||
+           isHandleDialogCommand(command);
 }
 

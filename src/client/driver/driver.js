@@ -31,7 +31,7 @@ import {
     UnexpectedDialogError,
     ExpectedDialogNotAppearedError
 } from '../../errors/test-run';
-import DialogsMonitor from './dialogs-monitor';
+import DialogsMonitor from './dialogs-monitor/parent';
 import * as browser from '../browser';
 
 import { TYPE as MESSAGE_TYPE } from './driver-link/messages';
@@ -219,7 +219,15 @@ export default class Driver {
                     this.childDriverLinks.push(childDriverLink);
                 }
 
-                childDriverLink.confirmConnectionEstablished(msg.id);
+                var expectedDialogs = this.dialogsMonitor.expectedDialogs;
+
+                childDriverLink.confirmConnectionEstablished(msg.id, expectedDialogs);
+            }
+
+            if (msg.type === 'blah') {
+                debugger;
+                if (this.dialogsMonitor)
+                    this.dialogsMonitor.expectedDialogs = msg.expectedDialogs;
             }
         });
     }
@@ -394,6 +402,12 @@ export default class Driver {
             .then(() => browser.checkStatus(this.browserStatusUrl, hammerhead.createNativeXHR));
     }
 
+    _sendInfoForAllIframes (expectedDialogs) {
+        var msg = { type: 'blah', expectedDialogs };
+
+        for (var i = 0; i < this.childDriverLinks.length; i++)
+            messageSandbox.sendServiceMsg(msg, this.childDriverLinks[i].driverWindow);
+    }
 
     // Routing
     _onReady (status) {
@@ -414,8 +428,10 @@ export default class Driver {
         this.readyPromise
             .then(() => {
                 // TODO: check of this.dialogMonitor we be removed when we add native dialogs support for iframes
-                if (this.dialogsMonitor && command.expectedDialogs)
+                if (this.dialogsMonitor && command.expectedDialogs) {
                     this.dialogsMonitor.expectedDialogs = command.expectedDialogs;
+                    this._sendInfoForAllIframes(command.expectedDialogs);
+                }
 
                 var isCommandRejectableByError = isCommandRejectableByPageError(command);
                 var pendingPageError           = this.contextStorage.getItem(PENDING_PAGE_ERROR);
