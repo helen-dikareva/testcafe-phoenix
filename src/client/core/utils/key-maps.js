@@ -81,6 +81,29 @@ export default {
         option: 'alt'
     },
 
+    keyProperty: {
+        backspace: 'Backspace',
+        capslock:  'CapsLock',
+        delete:    'Delete',
+        down:      'ArrowDown',
+        end:       'End',
+        enter:     'Enter',
+        esc:       'Escape',
+        home:      'Home',
+        ins:       'Insert',
+        left:      'ArrowLeft',
+        pagedown:  'PageDown',
+        pageup:    'PageUp',
+        right:     'ArrowRight',
+        space:     ' ',
+        tab:       'Tab',
+        up:        'ArrowUp',
+        alt:       'Alt',
+        ctrl:      'Control',
+        meta:      'Meta',
+        shift:     'Shift'
+    },
+
     symbolCharCodeToKeyCode: {
         96: 192,    // `
         91: 219,    // [

@@ -31,19 +31,20 @@ messageSandbox.on(messageSandbox.SERVICE_MSG_RECEIVED_EVENT, e => {
 
 export default class PressAutomation {
     constructor (keyCombinations) {
-        this.keyCombinations  = keyCombinations;
-        this.isSelectElement  = false;
-        this.pressedKeyString = '';
-        this.modifiersState   = null;
-        this.shortcutHandlers = null;
+        this.keyCombinations       = keyCombinations;
+        this.topSameDomainDocument = domUtils.getTopSameDomainWindow(window).document;
+        this.isSelectElement       = false;
+        this.pressedKeyString      = '';
+        this.modifiersState        = null;
+        this.shortcutHandlers      = null;
     }
 
     static _getKeyPressSimulators (keyCombination) {
-        var keys = getKeyArray(keyCombination);
+        var keysArray = getKeyArray(keyCombination);
 
-        keys = excludeShiftModifiedKeys(keys);
+        var { keys, keysForKeyEvent } = excludeShiftModifiedKeys(keysArray);
 
-        return arrayUtils.map(keys, key => new KeyPressSimulator(key));
+        return arrayUtils.map(keys, (key, index) => new KeyPressSimulator(key, keysForKeyEvent[index]));
     }
 
     static _getShortcuts (keyCombination) {
@@ -119,7 +120,7 @@ export default class PressAutomation {
             keyPressPrevented = !keyPressSimulator.press(this.modifiersState);
 
         if ((!keyPressPrevented || this.isSelectElement) && currentShortcutHandler) {
-            return currentShortcutHandler(getDeepActiveElement())
+            return currentShortcutHandler(getDeepActiveElement(this.topSameDomainDocument))
                 .then(() => delay(KEY_PRESS_DELAY));
         }
 
@@ -134,7 +135,7 @@ export default class PressAutomation {
 
     _runCombination (keyCombination) {
         this.modifiersState   = { ctrl: false, alt: false, shift: false, meta: false };
-        this.isSelectElement  = domUtils.isSelectElement(getDeepActiveElement());
+        this.isSelectElement  = domUtils.isSelectElement(getDeepActiveElement(this.topSameDomainDocument));
         this.pressedKeyString = '';
         this.shortcutHandlers = PressAutomation._getShortcutHandlers(keyCombination);
 

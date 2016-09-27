@@ -155,7 +155,7 @@ test('Expected alert during a wait action', async t => {
 test('No expected alert during a wait action', async t => {
     await t
         .setNativeDialogHandler(() => null)
-        .click('#buttonDialogAfterTimeout')
+        .click('#withoutDialog')
         .wait(10);
 
     var info = await t.getNativeDialogHistory();

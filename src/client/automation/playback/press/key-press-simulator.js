@@ -1,8 +1,9 @@
 import hammerhead from '../../deps/hammerhead';
 import { KEY_MAPS, domUtils, getSanitizedKey } from '../../deps/testcafe-core';
 import typeChar from '../type/type-char';
-import { getChar, getDeepActiveElement } from './utils';
+import { getChar, getDeepActiveElement, changeLetterCase } from './utils';
 import getKeyCode from '../../utils/get-key-code';
+import isLetterKey from '../../utils/is-letter';
 
 var browserUtils   = hammerhead.utils.browser;
 var extend         = hammerhead.utils.extend;
@@ -10,12 +11,16 @@ var eventSimulator = hammerhead.eventSandbox.eventSimulator;
 
 
 export default class KeyPressSimulator {
-    constructor (key) {
-        this.isChar          = key.length === 1 || key === 'space';
-        this.sanitizedKey    = getSanitizedKey(key);
-        this.modifierKeyCode = KEY_MAPS.modifiers[this.sanitizedKey];
-        this.specialKeyCode  = KEY_MAPS.specialKeys[this.sanitizedKey];
-        this.keyCode         = null;
+    constructor (key, originKey) {
+        this.isLetter              = isLetterKey(key);
+        this.isChar                = key.length === 1 || key === 'space';
+        this.sanitizedKey          = getSanitizedKey(key);
+        this.modifierKeyCode       = KEY_MAPS.modifiers[this.sanitizedKey];
+        this.specialKeyCode        = KEY_MAPS.specialKeys[this.sanitizedKey];
+        this.keyCode               = null;
+        this.keyProperty           = null;
+        this.originKey             = originKey;
+        this.topSameDomainDocument = domUtils.getTopSameDomainWindow(window).document;
 
         if (this.isChar && key !== 'space')
             this.keyCode = getKeyCode(this.sanitizedKey);
@@ -45,7 +50,8 @@ export default class KeyPressSimulator {
                 var isActiveElementInIframe = domUtils.isElementInIframe(element);
                 var isStoredElementInIframe = domUtils.isElementInIframe(this.storedActiveElement);
 
-                var shouldTypeInWebKit = !(isActiveElementInIframe !== isStoredElementInIframe && !isStoredElementEditable);
+                var shouldTypeInWebKit = !(isActiveElementInIframe !== isStoredElementInIframe &&
+                                           !isStoredElementEditable);
 
                 shouldType = (!browserUtils.isFirefox || isStoredElementEditable) &&
                              (!browserUtils.isWebKit || shouldTypeInWebKit);
@@ -66,19 +72,27 @@ export default class KeyPressSimulator {
     }
 
     down (modifiersState) {
-        this.storedActiveElement = getDeepActiveElement();
+        this.storedActiveElement = getDeepActiveElement(this.topSameDomainDocument);
 
         if (this.modifierKeyCode)
             modifiersState[this.sanitizedKey] = true;
 
-        return eventSimulator.keydown(this.storedActiveElement, extend({ keyCode: this.keyCode }, modifiersState));
+        this.keyProperty = KEY_MAPS.keyProperty[this.originKey] || this.originKey;
+
+        if (modifiersState.shift && this.isLetter)
+            this.keyProperty = changeLetterCase(this.keyProperty);
+
+        return eventSimulator.keydown(this.storedActiveElement, extend({
+            keyCode: this.keyCode,
+            key:     this.keyProperty
+        }, modifiersState));
     }
 
     press (modifiersState) {
         if (!(this.isChar || this.specialKeyCode))
             return true;
 
-        var activeElement = getDeepActiveElement();
+        var activeElement = getDeepActiveElement(this.topSameDomainDocument);
 
         var character      = this.isChar ? getChar(this.sanitizedKey, modifiersState.shift) : null;
         var charCode       = this.specialKeyCode || character.charCodeAt(0);
@@ -96,13 +110,14 @@ export default class KeyPressSimulator {
 
         var raiseDefault = eventSimulator.keypress(activeElement, extend({
             keyCode:  charCode,
-            charCode: charCode
+            charCode: charCode,
+            key:      this.keyProperty
         }, modifiersState));
 
         if (!raiseDefault)
             return raiseDefault;
 
-        activeElement = getDeepActiveElement();
+        activeElement = getDeepActiveElement(this.topSameDomainDocument);
 
         if (character && !(modifiersState.ctrl || modifiersState.alt))
             this._type(activeElement, character);
@@ -117,8 +132,11 @@ export default class KeyPressSimulator {
         if (this.modifierKeyCode)
             modifiersState[this.sanitizedKey] = false;
 
-        var raiseDefault  = eventSimulator.keyup(getDeepActiveElement(), extend({ keyCode: this.keyCode }, modifiersState));
-        var activeElement = getDeepActiveElement();
+        var raiseDefault  = eventSimulator.keyup(getDeepActiveElement(this.topSameDomainDocument), extend({
+            keyCode: this.keyCode,
+            key:     this.keyProperty
+        }, modifiersState));
+        var activeElement = getDeepActiveElement(this.topSameDomainDocument);
 
         if (raiseDefault && this.sanitizedKey === 'space' &&
             KeyPressSimulator._isKeyActivatedInputElement(activeElement))
