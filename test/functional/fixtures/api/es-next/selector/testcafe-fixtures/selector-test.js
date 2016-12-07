@@ -472,8 +472,8 @@ test('<option> text selector', async () => {
 test('Snapshot properties shorthands on selector', async () => {
     let el = Selector('#htmlElement');
 
-    expect(await el.nodeType).eql(1);
     expect(await el.id).eql('htmlElement');
+    expect(await el.nodeType).eql(1);
     expect(await el.tagName).eql('div');
     expect(await el.namespaceURI).eql('http://www.w3.org/1999/xhtml');
     expect(await el.childNodeCount).eql(3);
@@ -634,6 +634,38 @@ test('Selector "withText" method', async () => {
     expect(await elWithClass('idxEl').withText('element 1.').id).eql('el1');
 });
 
+test('Selector "filter" method', async () => {
+    // String filter
+    expect(await Selector('body div').filter('#htmlElementWithInnerText').id).eql('htmlElementWithInnerText');
+
+    // Function filter
+    expect(await Selector('#container div').filter(node => node.id === 'el3').id).eql('el3');
+
+    // Compound
+    expect(await Selector('div').filter('.common').filter('.class1').id).eql('common2');
+
+    // Parameterized selector
+    const withClass = Selector(className => document.getElementsByClassName(className));
+
+    expect(await withClass('common').filter('.class1').id).eql('common2');
+
+    // With other filters
+    expect(await Selector('div').filter('.common').nth(0).id).eql('common1');
+
+    // Should not apply implicit index filter when used as transitive selector
+    let label = Selector('#list *').filter('label');
+
+    expect(await label.filter('#release').id).eql('release');
+    expect(await label.filter('#write').id).eql('write');
+
+    // Should apply explicit index filter when used as transitive selector
+    label = Selector('#list *').filter('label');
+
+    expect(await label.nth(0).parent(0).find('#release').exists).to.be.false;
+    expect(await label.nth(1).parent(0).find('#release').exists).to.be.false;
+    expect(await label.nth(2).parent(0).find('#release').exists).to.be.true;
+});
+
 test('Combination of filter methods', async t => {
     const selector = Selector('div').withText('Hey?! (yo)').nth(1);
 
@@ -700,6 +732,7 @@ test('Selector "parent" method', async () => {
     expect((await Selector('g').parent(1).tagName).toLowerCase()).eql('a');
     expect((await Selector('g').parent().parent().tagName).toLowerCase()).eql('a');
     expect((await Selector('#option1').parent(2).tagName).toLowerCase()).eql('body');
+    expect(await Selector('g').parent(0).count).eql(1);
 
     // CSS selector filter
     expect((await Selector('g').parent('a').tagName).toLowerCase()).eql('a');
@@ -735,6 +768,7 @@ test('Selector "child" method', async () => {
     expect(await Selector('#container').child(1).id).eql('el2');
     expect(await Selector('#p2').child().child().id).eql('p0');
     expect(await Selector('#container').child(3).id).eql('el4');
+    expect(await Selector('body').child(0).count).eql(1);
 
     // CSS selector filter
     expect(await Selector('#container').child('#el3').id).eql('el3');
@@ -771,6 +805,7 @@ test('Selector "sibling" method', async () => {
     expect(await Selector('#el2').sibling(1).id).eql('el3');
     expect(await Selector('#el2').sibling().sibling().id).eql('el2');
     expect(await Selector('#el1').sibling(2).id).eql('el4');
+    expect(await Selector('#el2').sibling(0).count).eql(1);
 
     // CSS selector filter
     expect(await Selector('#selectInput').sibling('[type=checkbox]').id).eql('checkInput');

@@ -15,6 +15,7 @@ testcafe [options] <browser-list-comma-separated> <file-or-glob ...>
   * [Portable Browsers](#portable-browsers)
   * [Remote Browsers](#remote-browsers)
   * [Browsers Accessed Through Browser Provider Plugins](#browsers-accessed-through-browser-provider-plugins)
+  * [Starting browser with arguments](#starting-browser-with-arguments)
 * [File Path/Glob Pattern](#file-pathglob-pattern)
 * [Options](#options)
   * [-h, --help](#-h---help)
@@ -30,6 +31,7 @@ testcafe [options] <browser-list-comma-separated> <file-or-glob ...>
   * [-f \<name\>, --fixture \<name\>](#-f-name---fixture-name)
   * [-F \<pattern\>, --fixture-grep \<pattern\>](#-f-pattern---fixture-grep-pattern)
   * [--selector-timeout \<ms\>](#--selector-timeout-ms)
+  * [--assertion-timeout \<ms\>](#--assertion-timeout-ms)
   * [--ports \<port1,port2\>](#--ports-port1port2)
   * [--hostname \<name\>](#--hostname-name)
   * [--speed \<factor\>](#--speed-factor)
@@ -101,6 +103,22 @@ specify a browser alias that consists of the `{browser-provider-name}` prefix an
 ```sh
 testcafe "saucelabs:Chrome@52.0:Windows 8.1" tests/sample-fixture.js
 ```
+
+### Starting browser with arguments
+
+If you need to pass arguments for the specified browser, write them right after browser alias. Surround the browser call and its arguments with quotation marks:
+
+```sh
+testcafe "chrome --start-fullscreen" tests/sample-fixture.js
+```
+
+You can also specify arguments for portable browsers. If a path to a browser contains spaces, the path should be surrounded with backticks:
+
+```sh
+testcafe "path:`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe` --start-fullscreen" tests/sample-fixture.js
+```
+
+You can specify arguments for local browsers only.
 
 ## File Path/Glob Pattern
 
@@ -276,8 +294,21 @@ testcafe ie my-tests -F "Page.*"
 Specifies the amount of time, in milliseconds, within which [selectors](../test-api/selecting-page-elements/selectors.md) make
 attempts to obtain a node to be returned. See [Selector Timeout](../test-api/selecting-page-elements/selectors.md#selector-timeout).
 
+**Default value**: `10000`
+
 ```sh
 testcafe ie my-tests --selector-timeout 500000
+```
+
+### --assertion-timeout \<ms\>
+
+Specifies the amount of time, in milliseconds, within which TestCafe makes attempts to successfully execute an [assertion](../test-api/assertions/index.md) if [a selector property](../test-api/selecting-page-elements/selectors.md#define-assertion-actual-value) was used.
+See [Smart Assertion Query Mechanism](../test-api/assertions/index.md#smart-assertion-query-mechanism).
+
+**Default value**: `3000`
+
+```sh
+testcafe ie my-tests --assertion-timeout 10000
 ```
 
 ### --ports \<port1,port2\>

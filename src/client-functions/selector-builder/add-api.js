@@ -3,6 +3,7 @@ import { ELEMENT_SNAPSHOT_PROPERTIES, NODE_SNAPSHOT_PROPERTIES } from './snapsho
 import { CantObtainInfoForElementSpecifiedBySelectorError } from '../../errors/test-run';
 import getCallsite from '../../errors/get-callsite';
 import ClientFunctionBuilder from '../client-function-builder';
+import SelectorResultPromise from './result-promise';
 import {
     assertStringOrRegExp,
     assertNonNegativeNumber,
@@ -89,49 +90,99 @@ async function getSnapshot (getSelector, callsite) {
 function addSnapshotPropertyShorthands (obj, getSelector) {
     SNAPSHOT_PROPERTIES.forEach(prop => {
         Object.defineProperty(obj, prop, {
-            get: async () => {
+            get: () => {
                 var callsite = getCallsite('get');
-                var snapshot = await getSnapshot(getSelector, callsite);
 
-                return snapshot[prop];
+                return SelectorResultPromise.fromFn(async () => {
+                    var snapshot = await getSnapshot(getSelector, callsite);
+
+                    return snapshot[prop];
+                });
             }
         });
     });
 
-    obj.getStyleProperty = async prop => {
+    obj.getStyleProperty = prop => {
         var callsite = getCallsite('getStyleProperty');
-        var snapshot = await getSnapshot(getSelector, callsite);
 
-        return snapshot.style ? snapshot.style[prop] : void 0;
+        return SelectorResultPromise.fromFn(async () => {
+            var snapshot = await getSnapshot(getSelector, callsite);
+
+            return snapshot.style ? snapshot.style[prop] : void 0;
+        });
     };
 
-    obj.getAttribute = async attrName => {
+    obj.getAttribute = attrName => {
         var callsite = getCallsite('getAttribute');
-        var snapshot = await getSnapshot(getSelector, callsite);
 
-        return snapshot.attributes ? snapshot.attributes[attrName] : void 0;
+        return SelectorResultPromise.fromFn(async () => {
+            var snapshot = await getSnapshot(getSelector, callsite);
+
+            return snapshot.attributes ? snapshot.attributes[attrName] : void 0;
+        });
     };
 
-    obj.getBoundingClientRectProperty = async prop => {
+    obj.getBoundingClientRectProperty = prop => {
         var callsite = getCallsite('getBoundingClientRectProperty');
-        var snapshot = await getSnapshot(getSelector, callsite);
 
-        return snapshot.boundingClientRect ? snapshot.boundingClientRect[prop] : void 0;
+        return SelectorResultPromise.fromFn(async () => {
+            var snapshot = await getSnapshot(getSelector, callsite);
+
+            return snapshot.boundingClientRect ? snapshot.boundingClientRect[prop] : void 0;
+        });
     };
 
-    obj.hasClass = async name => {
+    obj.hasClass = name => {
         var callsite = getCallsite('hasClass');
-        var snapshot = await getSnapshot(getSelector, callsite);
 
-        return snapshot.classNames ? snapshot.classNames.indexOf(name) > -1 : false;
+        return SelectorResultPromise.fromFn(async () => {
+            var snapshot = await getSnapshot(getSelector, callsite);
+
+            return snapshot.classNames ? snapshot.classNames.indexOf(name) > -1 : false;
+        });
     };
+}
+
+function createCounter (getSelector, SelectorBuilder) {
+    var builder  = new SelectorBuilder(getSelector(), { counterMode: true }, { instantiation: 'Selector' });
+    var counter  = builder.getFunction();
+    var callsite = getCallsite('get');
+
+    return async () => {
+        try {
+            return await counter();
+        }
+
+        catch (err) {
+            err.callsite = callsite;
+            throw err;
+        }
+    };
+}
+
+function addCounterProperties (obj, getSelector, SelectorBuilder) {
+    Object.defineProperty(obj, 'count', {
+        get: () => {
+            var counter = createCounter(getSelector, SelectorBuilder);
+
+            return SelectorResultPromise.fromFn(() => counter());
+        }
+    });
+
+    Object.defineProperty(obj, 'exists', {
+        get: () => {
+            var counter = createCounter(getSelector, SelectorBuilder);
+
+            return SelectorResultPromise.fromFn(async () => await counter() > 0);
+        }
+    });
 }
 
 function addFilterMethods (obj, getSelector, SelectorBuilder) {
     obj.nth = index => {
         assertNonNegativeNumber('nth', '"index" argument', index);
 
-        var builder = new SelectorBuilder(getSelector(), { index: index });
+        var builder = new SelectorBuilder(getSelector(), { index: index }, { instantiation: 'Selector' });
 
         return builder.getFunction();
     };
@@ -139,7 +190,34 @@ function addFilterMethods (obj, getSelector, SelectorBuilder) {
     obj.withText = text => {
         assertStringOrRegExp('withText', '"text" argument', text);
 
-        var builder = new SelectorBuilder(getSelector(), { text: text });
+        var builder = new SelectorBuilder(getSelector(), { text: text }, { instantiation: 'Selector' });
+
+        return builder.getFunction();
+    };
+
+    obj.filter = filter => {
+        assertFunctionOrString('filter', '"filter" argument', filter);
+
+        var selectorFn = () => {
+            /* eslint-disable no-undef */
+            var nodes = selector();
+
+            if (!nodes.length)
+                return null;
+
+            return filterNodes(nodes, filter, document);
+            /* eslint-enable no-undef */
+        };
+
+        var collectionModeSelectorBuilder = new SelectorBuilder(getSelector(), { collectionMode: true });
+
+        var dependencies = {
+            selector:    collectionModeSelectorBuilder.getFunction(),
+            filter:      filter,
+            filterNodes: filterNodes
+        };
+
+        var builder = new SelectorBuilder(selectorFn, { dependencies }, { instantiation: 'Selector' });
 
         return builder.getFunction();
     };
@@ -156,7 +234,7 @@ function createHierachicalSelector (getSelector, SelectorBuilder, selectorFn, fi
 
     dependencies = assign(dependencies, additionalDependencies);
 
-    var builder = new SelectorBuilder(selectorFn, { dependencies });
+    var builder = new SelectorBuilder(selectorFn, { dependencies }, { instantiation: 'Selector' });
 
     return builder.getFunction();
 }
@@ -213,7 +291,7 @@ function addHierachicalSelectors (obj, getSelector, SelectorBuilder) {
                 for (node = node.parentNode; node; node = node.parentNode)
                     parents.push(node);
 
-                return filter ? filterNodes(parents, filter, document) : parents;
+                return filter !== void 0 ? filterNodes(parents, filter, document) : parents;
             });
             /* eslint-enable no-undef */
         };
@@ -239,7 +317,7 @@ function addHierachicalSelectors (obj, getSelector, SelectorBuilder) {
                         childElements.push(child);
                 }
 
-                return filter ? filterNodes(childElements, filter, node) : childElements;
+                return filter !== void 0 ? filterNodes(childElements, filter, node) : childElements;
             });
             /* eslint-enable no-undef */
         };
@@ -270,40 +348,13 @@ function addHierachicalSelectors (obj, getSelector, SelectorBuilder) {
                         siblings.push(child);
                 }
 
-                return filter ? filterNodes(siblings, filter, parent) : siblings;
+                return filter !== void 0 ? filterNodes(siblings, filter, parent) : siblings;
             });
             /* eslint-enable no-undef */
         };
 
         return createHierachicalSelector(getSelector, SelectorBuilder, selectorFn, filter, { filterNodes });
     };
-}
-
-function createCounter (getSelector, SelectorBuilder) {
-    var builder = new SelectorBuilder(getSelector(), { counterMode: true }, {
-        instantiation: 'Selector',
-        execution:     'get'
-    });
-
-    return builder.getFunction();
-}
-
-function addCounterProperties (obj, getSelector, SelectorBuilder) {
-    Object.defineProperty(obj, 'count', {
-        get: () => {
-            var counter = createCounter(getSelector, SelectorBuilder);
-
-            return counter();
-        }
-    });
-
-    Object.defineProperty(obj, 'exists', {
-        get: async () => {
-            var counter = createCounter(getSelector, SelectorBuilder);
-
-            return await counter() > 0;
-        }
-    });
 }
 
 export default function addAPI (obj, getSelector, SelectorBuilder) {

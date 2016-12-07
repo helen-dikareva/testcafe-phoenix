@@ -12,7 +12,8 @@ import promisify from '../utils/promisify';
 import { GeneralError } from '../errors/runtime';
 import MESSAGE from '../errors/runtime/message';
 import getViewPortWidth from '../utils/get-viewport-width';
-import { wordWrap } from '../utils/string';
+import { wordWrap, splitQuotedText } from '../utils/string';
+
 
 var ensureDir = promisify(mkdirp);
 var stat      = promisify(fs.stat);
@@ -61,13 +62,6 @@ export default class CLIArgumentParser {
         throw new GeneralError(MESSAGE.portNumberIsNotInteger);
     }
 
-    static _parseSelectorTimeout (value) {
-        if (CLIArgumentParser._isInteger(value))
-            return parseInt(value, 10);
-
-        throw new GeneralError(MESSAGE.selectorTimeoutIsNotAnInteger);
-    }
-
     static _optionValueToRegExp (name, value) {
         if (value === void 0)
             return value;
@@ -83,46 +77,6 @@ export default class CLIArgumentParser {
     static _getDescription () {
         // NOTE: add empty line to workaround commander-forced indentation on the first line.
         return '\n' + wordWrap(DESCRIPTION, 2, getViewPortWidth(process.stdout));
-    }
-
-    static _parseBrowserArg (browserArg) {
-        var currentBrowser = '';
-        var browsers       = [];
-        var quoteChar      = null;
-
-        for (var i = 0; i < browserArg.length; i++) {
-            var currentChar = browserArg[i];
-
-            switch (currentChar) {
-                case ',':
-                    if (quoteChar)
-                        currentBrowser += currentChar;
-                    else {
-                        browsers.push(currentBrowser);
-                        currentBrowser = '';
-                    }
-                    break;
-
-                case '"':
-                case '\'':
-                    if (quoteChar === currentChar)
-                        quoteChar = null;
-                    else if (!quoteChar)
-                        quoteChar = currentChar;
-                    else
-                        currentBrowser += currentChar;
-                    break;
-
-                default:
-                    currentBrowser += currentChar;
-                    break;
-            }
-        }
-
-        if (currentBrowser)
-            browsers.push(currentBrowser);
-
-        return browsers;
     }
 
     _describeProgram () {
@@ -145,6 +99,7 @@ export default class CLIArgumentParser {
             .option('-f, --fixture <name>', 'run only fixtures with the specified name')
             .option('-F, --fixture-grep <pattern>', 'run only fixtures matching the specified pattern')
             .option('--selector-timeout <ms>', 'set the amount of time within which selectors make attempts to obtain a node to be returned')
+            .option('--assertion-timeout <ms>', 'set the amount of time within which assertion should pass')
             .option('--speed <factor>', 'set the speed of test execution (0.01 ... 1)')
             .option('--ports <port1,port2>', 'specify custom port numbers')
             .option('--hostname <name>', 'specify the hostname')
@@ -188,17 +143,32 @@ export default class CLIArgumentParser {
         };
     }
 
-    async _parseElementTimeout () {
-        if (this.opts.selectorTimeout)
-            this.opts.selectorTimeout = CLIArgumentParser._parseSelectorTimeout(this.opts.selectorTimeout);
+    _parseSelectorTimeout () {
+        if (this.opts.selectorTimeout) {
+            if (CLIArgumentParser._isInteger(this.opts.selectorTimeout))
+                this.opts.selectorTimeout = parseInt(this.opts.selectorTimeout, 10);
+
+            else
+                throw new GeneralError(MESSAGE.selectorTimeoutIsNotAnInteger);
+        }
     }
 
-    async _parseSpeed () {
+    _parseAssertionTimeout () {
+        if (this.opts.assertionTimeout) {
+            if (CLIArgumentParser._isInteger(this.opts.assertionTimeout))
+                this.opts.assertionTimeout = parseInt(this.opts.assertionTimeout, 10);
+
+            else
+                throw new GeneralError(MESSAGE.assertionTimeoutIsNotAnInteger);
+        }
+    }
+
+    _parseSpeed () {
         if (this.opts.speed)
             this.opts.speed = parseFloat(this.opts.speed);
     }
 
-    async _parsePorts () {
+    _parsePorts () {
         if (this.opts.ports) {
             this.opts.ports = this.opts.ports
                 .split(',')
@@ -209,11 +179,10 @@ export default class CLIArgumentParser {
         }
     }
 
-    async _parseBrowserList () {
+    _parseBrowserList () {
         var browsersArg = this.program.args[0] || '';
 
-        this.browsers = CLIArgumentParser
-            ._parseBrowserArg(browsersArg)
+        this.browsers = splitQuotedText(browsersArg, ',')
             .filter(browser => browser && this._filterAndCountRemotes(browser));
     }
 
@@ -284,7 +253,8 @@ export default class CLIArgumentParser {
         this._parseFilteringOptions();
 
         await Promise.all([
-            this._parseElementTimeout(),
+            this._parseSelectorTimeout(),
+            this._parseAssertionTimeout(),
             this._parseSpeed(),
             this._parsePorts(),
             this._parseScreenshotsPath(),
