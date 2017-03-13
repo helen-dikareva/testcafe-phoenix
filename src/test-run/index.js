@@ -28,8 +28,7 @@ import {
     isCommandRejectableByPageError,
     isBrowserManipulationCommand,
     isServiceCommand,
-    shouldBreakBeforeCommand,
-    isExecutableOnServer
+    shouldBreakBeforeCommand
 } from './commands/utils';
 
 //Const
@@ -230,6 +229,12 @@ export default class TestRun extends Session {
         return this._enqueueCommand(command, callsite);
     }
 
+    async _enqueueShowDebuggingCommand (callsite) {
+        showDebuggerMessage(callsite, this.browserConnection.userAgent);
+
+        await this._enqueueCommand(new ShowDebuggingStatusCommand(), callsite);
+    }
+
     async _enqueueBrowserManipulationCommand (command, callsite) {
         if (command.type === COMMAND_TYPE.resizeWindowToFitDevice)
             command = TestRun._transformResizeWindowToFitDeviceCommand(command);
@@ -348,19 +353,6 @@ export default class TestRun extends Session {
     }
 
     // Execute command
-    _executeCommand (command, callsite) {
-        if (command.type === COMMAND_TYPE.wait)
-            return new Promise(resolve => setTimeout(resolve, command.timeout));
-
-        if (command.type === COMMAND_TYPE.assertion)
-            return this._executeAssertion(command, callsite);
-
-        if (command.type === COMMAND_TYPE.maximizeWindow)
-            return this._maximizeBrowserWindow();
-
-        return Promise.resolve();
-    }
-
     async _executeAssertion (command, callsite) {
         var executor = new AssertionExecutor(command, callsite);
 
@@ -373,20 +365,27 @@ export default class TestRun extends Session {
     async executeCommand (command, callsite) {
         this.debugLog.command(command);
 
-        if (command.type === COMMAND_TYPE.testDone)
-            this.testDoneCommandQueued = true;
-
         if (this.pendingPageError && isCommandRejectableByPageError(command))
             return this._rejectCommandWithPageError(callsite);
 
-        if (command.type === COMMAND_TYPE.debug || this.debugging && shouldBreakBeforeCommand(command)) {
-            showDebuggerMessage(callsite, this.browserConnection.userAgent);
+        if (command.type === COMMAND_TYPE.testDone)
+            this.testDoneCommandQueued = true;
 
-            await this._enqueueCommand(new ShowDebuggingStatusCommand(), callsite);
-        }
+        if (this.debugging && shouldBreakBeforeCommand(command))
+            await this._enqueueShowDebuggingCommand(callsite);
 
-        if (isExecutableOnServer(command))
-            return this._executeCommand(command, callsite);
+
+        if (command.type === COMMAND_TYPE.wait)
+            return new Promise(resolve => setTimeout(resolve, command.timeout));
+
+        if (command.type === COMMAND_TYPE.assertion)
+            return this._executeAssertion(command, callsite);
+
+        if (command.type === COMMAND_TYPE.maximizeWindow)
+            return this._maximizeBrowserWindow();
+
+        if (command.type === COMMAND_TYPE.debug)
+            return await this._enqueueShowDebuggingCommand(callsite);
 
         if (isBrowserManipulationCommand(command))
             return this._enqueueBrowserManipulationCommand(command, callsite);

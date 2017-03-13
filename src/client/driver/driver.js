@@ -437,7 +437,7 @@ export default class Driver {
         if (command.type === COMMAND_TYPE.testDone)
             this._onTestDone(new DriverStatus({ isCommandResult: true }));
 
-        else if (command.type === COMMAND_TYPE.showDebuggingStatusCommand)
+        else if (command.type === COMMAND_TYPE.showDebuggingStatus)
             this._onShowDebuggingStatusCommand();
 
         else if (command.type === COMMAND_TYPE.prepareBrowserManipulation)

@@ -22,9 +22,9 @@ function isWindowSwitchingCommand (command) {
 }
 
 export function shouldBreakBeforeCommand (command) {
-    return command.type !== TYPE.executeClientFunction &&
-           command.type !== TYPE.executeSelector && !isBrowserManipulationCommand(command) &&
-           !isServiceCommand(command);
+    return command.type !== TYPE.debug &&
+           command.type !== TYPE.executeClientFunction && command.type !== TYPE.executeSelector &&
+           !isBrowserManipulationCommand(command) && !isServiceCommand(command);
 }
 
 export function isBrowserManipulationCommand (command) {
@@ -50,7 +50,7 @@ export function isServiceCommand (command) {
            command.type === TYPE.takeScreenshotOnFail ||
            command.type === TYPE.showAssertionRetriesStatus ||
            command.type === TYPE.hideAssertionRetriesStatus ||
-           command.type === TYPE.showDebuggingStatusCommand ||
+           command.type === TYPE.showDebuggingStatus ||
            isServicePrepareBrowserManipulationCommand(command);
 }
 
@@ -64,12 +64,5 @@ export function isExecutableInTopWindowOnly (command) {
            command.type === TYPE.setTestSpeed ||
            command.type === TYPE.showAssertionRetriesStatus ||
            command.type === TYPE.hideAssertionRetriesStatus ||
-           command.type === TYPE.showDebuggingStatusCommand;
-}
-
-export function isExecutableOnServer (command) {
-    return command.type === TYPE.debug ||
-           command.type === TYPE.wait ||
-           command.type === TYPE.assertion ||
-           command.type === TYPE.maximizeWindow;
+           command.type === TYPE.showDebuggingStatus;
 }

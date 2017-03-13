@@ -24,7 +24,7 @@ export class HideAssertionRetriesStatusCommand {
 
 export class ShowDebuggingStatusCommand {
     constructor () {
-        this.type = TYPE.showDebuggingStatusCommand;
+        this.type = TYPE.showDebuggingStatus;
     }
 }
 
