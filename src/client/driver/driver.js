@@ -14,8 +14,7 @@ import TEST_RUN_MESSAGES from '../../test-run/client-messages';
 import COMMAND_TYPE from '../../test-run/commands/type';
 import {
     isCommandRejectableByPageError,
-    isExecutableInTopWindowOnly,
-    isVisualManipulationCommand
+    isExecutableInTopWindowOnly
 } from '../../test-run/commands/utils';
 import {
     UncaughtErrorOnPage,
@@ -109,13 +108,6 @@ export default class Driver {
         preventRealEvents();
 
         hammerhead.on(hammerhead.EVENTS.uncaughtJsError, err => this._onJsError(err));
-    }
-
-    _showDebuggingStatus () {
-        return transport
-            .queuedAsyncServiceMsg({ cmd: TEST_RUN_MESSAGES.showDebuggerMessage })
-            .then(() => this.statusBar.showDebuggingStatus())
-            .then(stopAfterNextAction => this.contextStorage.setItem(STOP_AFTER_NEXT_ACTION, stopAfterNextAction));
     }
 
     set speed (val) {
@@ -394,8 +386,9 @@ export default class Driver {
             });
     }
 
-    _onDebugCommand () {
-        this._showDebuggingStatus()
+    _onShowDebuggingStatusCommand () {
+        this.statusBar.showDebuggingStatus()
+            .then(stopAfterNextAction => this.contextStorage.setItem(STOP_AFTER_NEXT_ACTION, stopAfterNextAction))
             .then(() => this._onReady(new DriverStatus({ isCommandResult: true })));
     }
 
@@ -418,10 +411,6 @@ export default class Driver {
             .then(() => this._onReady(new DriverStatus({ isCommandResult: true })));
     }
 
-    _onAssertionCommand () {
-        return this._onReady(new DriverStatus({ isCommandResult: true }));
-    }
-
     _onTestDone (status) {
         this.contextStorage.setItem(TEST_DONE_SENT_FLAG, true);
 
@@ -435,17 +424,8 @@ export default class Driver {
     _onReady (status) {
         this._sendStatus(status)
             .then(command => {
-                if (command) {
-                    var isDebugging = this.contextStorage.getItem(STOP_AFTER_NEXT_ACTION) &&
-                                      isVisualManipulationCommand(command);
-
-                    if (isDebugging) {
-                        this._showDebuggingStatus()
-                            .then(() => this._onCommand(command));
-                    }
-                    else
-                        this._onCommand(command);
-                }
+                if (command)
+                    this._onCommand(command);
 
                 // NOTE: the driver gets an empty response if TestRun doesn't get a new command within 2 minutes
                 else
@@ -457,8 +437,8 @@ export default class Driver {
         if (command.type === COMMAND_TYPE.testDone)
             this._onTestDone(new DriverStatus({ isCommandResult: true }));
 
-        else if (command.type === COMMAND_TYPE.debug)
-            this._onDebugCommand();
+        else if (command.type === COMMAND_TYPE.showDebuggingStatusCommand)
+            this._onShowDebuggingStatusCommand();
 
         else if (command.type === COMMAND_TYPE.prepareBrowserManipulation)
             this._onPrepareBrowserManipulationCommand();
@@ -492,9 +472,6 @@ export default class Driver {
 
         else if (command.type === COMMAND_TYPE.hideAssertionRetriesStatus)
             this._onHideAssertionRetriesStatusCommand(command);
-
-        else if (command.type === COMMAND_TYPE.assertion)
-            this._onAssertionCommand();
 
         else
             this._onActionCommand(command);

@@ -20,13 +20,16 @@ import {
     TestDoneCommand,
     PrepareBrowserManipulationCommand,
     ShowAssertionRetriesStatusCommand,
-    HideAssertionRetriesStatusCommand
+    HideAssertionRetriesStatusCommand,
+    ShowDebuggingStatusCommand
 } from './commands/service';
 
 import {
     isCommandRejectableByPageError,
     isBrowserManipulationCommand,
-    isServiceCommand
+    isServiceCommand,
+    shouldBreakBeforeCommand,
+    isExecutableOnServer
 } from './commands/utils';
 
 //Const
@@ -227,6 +230,25 @@ export default class TestRun extends Session {
         return this._enqueueCommand(command, callsite);
     }
 
+    async _enqueueBrowserManipulationCommand (command, callsite) {
+        if (command.type === COMMAND_TYPE.resizeWindowToFitDevice)
+            command = TestRun._transformResizeWindowToFitDeviceCommand(command);
+
+        if (command.type === COMMAND_TYPE.resizeWindow) {
+            var browserId = this.browserConnection.id;
+            var provider  = this.browserConnection.provider;
+
+            var canResizeWindow = await provider.canResizeWindowToDimensions(browserId, command.width, command.height);
+
+            if (!canResizeWindow)
+                return Promise.reject(new WindowDimensionsOverflowError(callsite));
+        }
+
+        this.browserManipulationQueue.push(command);
+
+        return this.executeCommand(new PrepareBrowserManipulationCommand(command.type), callsite);
+    }
+
     _removeAllNonServiceTasks () {
         this.driverTaskQueue = this.driverTaskQueue.filter(driverTask => isServiceCommand(driverTask.command));
 
@@ -326,6 +348,19 @@ export default class TestRun extends Session {
     }
 
     // Execute command
+    _executeCommand (command, callsite) {
+        if (command.type === COMMAND_TYPE.wait)
+            return new Promise(resolve => setTimeout(resolve, command.timeout));
+
+        if (command.type === COMMAND_TYPE.assertion)
+            return this._executeAssertion(command, callsite);
+
+        if (command.type === COMMAND_TYPE.maximizeWindow)
+            return this._maximizeBrowserWindow();
+
+        return Promise.resolve();
+    }
+
     async _executeAssertion (command, callsite) {
         var executor = new AssertionExecutor(command, callsite);
 
@@ -338,49 +373,26 @@ export default class TestRun extends Session {
     async executeCommand (command, callsite) {
         this.debugLog.command(command);
 
-        if (this.pendingPageError && isCommandRejectableByPageError(command))
-            return this._rejectCommandWithPageError(callsite);
-
-        if (command.type === COMMAND_TYPE.resizeWindowToFitDevice)
-            command = TestRun._transformResizeWindowToFitDeviceCommand(command);
-
-        if (command.type === COMMAND_TYPE.resizeWindow) {
-            var browserId = this.browserConnection.id;
-            var provider  = this.browserConnection.provider;
-
-            var canResizeWindow = await provider.canResizeWindowToDimensions(browserId, command.width, command.height);
-
-            if (!canResizeWindow)
-                return Promise.reject(new WindowDimensionsOverflowError(callsite));
-        }
-
-        if (command.type === COMMAND_TYPE.maximizeWindow)
-            return this._maximizeBrowserWindow();
-
-        if (isBrowserManipulationCommand(command)) {
-            this.browserManipulationQueue.push(command);
-
-            return this.executeCommand(new PrepareBrowserManipulationCommand(command.type), callsite);
-        }
-
-        if (command.type === COMMAND_TYPE.wait)
-            return new Promise(resolve => setTimeout(resolve, command.timeout));
-
         if (command.type === COMMAND_TYPE.testDone)
             this.testDoneCommandQueued = true;
 
+        if (this.pendingPageError && isCommandRejectableByPageError(command))
+            return this._rejectCommandWithPageError(callsite);
+
+        if (command.type === COMMAND_TYPE.debug || this.debugging && shouldBreakBeforeCommand(command)) {
+            showDebuggerMessage(callsite, this.browserConnection.userAgent);
+
+            await this._enqueueCommand(new ShowDebuggingStatusCommand(), callsite);
+        }
+
+        if (isExecutableOnServer(command))
+            return this._executeCommand(command, callsite);
+
+        if (isBrowserManipulationCommand(command))
+            return this._enqueueBrowserManipulationCommand(command, callsite);
+
         if (command.type === COMMAND_TYPE.setNativeDialogHandler)
             return this._enqueueSetDialogHandlerCommand(command, callsite);
-
-
-        if (command.type === COMMAND_TYPE.assertion) {
-            // NOTE: we should send the assertion command to the client only if the test is executed
-            // step-by-step in debugging mode to show debugging status in the status panel
-            if (this.debugging)
-                await this._enqueueCommand(command, callsite);
-
-            return this._executeAssertion(command, callsite);
-        }
 
         return this._enqueueCommand(command, callsite);
     }
@@ -447,12 +459,4 @@ ServiceMessages[CLIENT_MESSAGES.waitForFileDownload] = function (msg) {
         else
             this.resolveWaitForFileDownloadingPromise = resolve;
     });
-};
-
-ServiceMessages[CLIENT_MESSAGES.showDebuggerMessage] = function (msg) {
-    this.debugLog.driverMessage(msg);
-
-    showDebuggerMessage(this.currentDriverTask.callsite, this.browserConnection.userAgent);
-
-    return Promise.resolve();
 };

@@ -26,6 +26,7 @@ export default {
     prepareBrowserManipulation: 'prepare-browser-manipulation',
     showAssertionRetriesStatus: 'show-assertion-retries-status',
     hideAssertionRetriesStatus: 'hide-assertion-retries-status',
+    showDebuggingStatusCommand: 'show-debugging-status-command',
     resizeWindow:               'resize-window',
     resizeWindowToFitDevice:    'resize-window-to-fit-device',
     maximizeWindow:             'maximize-window',

@@ -22,6 +22,12 @@ export class HideAssertionRetriesStatusCommand {
     }
 }
 
+export class ShowDebuggingStatusCommand {
+    constructor () {
+        this.type = TYPE.showDebuggingStatusCommand;
+    }
+}
+
 export class TestDoneCommand {
     constructor () {
         this.type = TYPE.testDone;
