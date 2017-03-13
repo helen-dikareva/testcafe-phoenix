@@ -20,6 +20,7 @@ import { getOffsetOptions } from './utils/offsets';
 import calculateSelectTextArguments from './playback/select/calculate-select-text-arguments';
 import ERROR_TYPES from './errors';
 import cursor from './cursor';
+import SelectorGenerator from './selector-generator';
 
 
 exports.Click                 = ClickAutomation;
@@ -42,6 +43,7 @@ exports.AutomationSettings           = AutomationSettings;
 exports.getOffsetOptions             = getOffsetOptions;
 exports.calculateSelectTextArguments = calculateSelectTextArguments;
 exports.cursor                       = cursor;
+exports.SelectorGenerator            = SelectorGenerator;
 
 exports.get = require;
 

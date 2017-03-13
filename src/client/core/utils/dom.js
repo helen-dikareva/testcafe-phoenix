@@ -44,7 +44,9 @@ export var getScrollbarSize                       = hammerhead.utils.dom.getScro
 export var getMapContainer                        = hammerhead.utils.dom.getMapContainer;
 export var getTagName                             = hammerhead.utils.dom.getTagName;
 export var closest                                = hammerhead.utils.dom.closest;
+export var matches                                = hammerhead.utils.dom.matches;
 export var getParents                             = hammerhead.utils.dom.getParents;
+export var getParentsUntil                        = hammerhead.utils.dom.getParentsUntil;
 export var getTopSameDomainWindow                 = hammerhead.utils.dom.getTopSameDomainWindow;
 
 function getElementsWithTabIndex (elements) {
@@ -312,16 +314,10 @@ export function isElementContainsNode (parentElement, childNode) {
     return checkChildNodes(parentElement, childNode);
 }
 
-export function getOptionIndex (select, option) {
-    var children = select.querySelectorAll('option');
+export function getElementIndexInParent (parent, child) {
+    var children = parent.querySelectorAll(getTagName(child));
 
-    return arrayUtils.indexOf(children, option);
-}
-
-export function getOptionGroupIndex (select, optgroutp) {
-    var children = select.querySelectorAll('optgroup');
-
-    return arrayUtils.indexOf(children, optgroutp);
+    return arrayUtils.indexOf(children, child);
 }
 
 export function setUnselectableAttributeRecursive (el) {
