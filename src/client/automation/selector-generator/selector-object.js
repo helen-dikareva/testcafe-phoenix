@@ -14,6 +14,7 @@ export class FilterOption {
 
 export class SelectorObject {
     constructor (obj) {
+        this.ruleType         = obj.ruleType;
         this.element          = obj.element;
         this.ancestorSelector = obj.ancestorSelector;
         this.selector         = obj.selector;

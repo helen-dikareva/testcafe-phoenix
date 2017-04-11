@@ -8,9 +8,7 @@ import {
     getTagTreeFilterOptions,
     getAttributeNamesForSelector,
     getAttributesSelector,
-    getIdSelector,
-    getAncestorWithId,
-    getAncestorByRule
+    getIdSelector
 } from './utils';
 import { getTagTreeFilter, getTextFilter } from './filters';
 
@@ -37,38 +35,11 @@ class BaseRule {
         //Not implemented
     }
 
-    generateSelector (el) {
+    generate (el, ancestorSelector) {
         this._init(el);
 
         if (this._shouldGenerate(el))
-            return this._getSelector(el);
-
-        return null;
-    }
-}
-
-class CompositeRule extends BaseRule {
-    constructor (type, AncestorRuleType) {
-        super(type);
-
-        this.ancestorRule     = AncestorRuleType ? new AncestorRuleType() : null;
-        this.ancestor         = null;
-        this.ancestorSelector = null;
-    }
-
-    _generateAncestorSelector () {
-        //Not implemented
-    }
-
-    generateSelector (el) {
-        this._init(el);
-
-        if (this._shouldGenerate(el)) {
-            this._generateAncestorSelector(el);
-
-            if (this.ancestorSelector)
-                return this._getSelector(el);
-        }
+            return this._getSelector(el, ancestorSelector);
 
         return null;
     }
@@ -90,7 +61,29 @@ class ByTagRule extends BaseRule {
     }
 
     _getSelector (el) {
-        return new SelectorObject({ element: el, selector: this.tagName });
+        return new SelectorObject({ ruleType: this.type, element: el, selector: this.tagName });
+    }
+}
+
+class ByNameAttr extends BaseRule {
+    constructor () {
+        super(RULE_TYPE.byNameAttr);
+
+        this.nameAttr = null;
+    }
+
+    _init (el) {
+        this.nameAttr = el.getAttribute('name');
+    }
+
+    _shouldGenerate (el) {
+        return domUtils.isInputElement(el) && !!this.nameAttr;
+    }
+
+    _getSelector (el) {
+        var attributes = [{ name: 'name', value: this.nameAttr }];
+
+        return getAttributesSelector(this.type, el, attributes);
     }
 }
 
@@ -131,6 +124,7 @@ class ByTextRule extends BaseRule {
 
     _getSelector (el) {
         return new SelectorObject({
+            ruleType:      this.type,
             element:       el,
             selector:      domUtils.getTagName(el),
             filterOptions: new FilterOption(FILTER_OPTIONS_TYPES.text, this.text),
@@ -155,7 +149,7 @@ class ByAttrRule extends BaseRule {
     }
 
     _getSelector (el) {
-        return getAttributesSelector(el, this.attributes);
+        return getAttributesSelector(this.type, el, this.attributes);
     }
 }
 
@@ -173,6 +167,7 @@ class ByTagTreeRule extends BaseRule {
         var filterOptions = getTagTreeFilterOptions(el, body);
 
         return new SelectorObject({
+            ruleType:      this.type,
             element:       el,
             selector:      'body',
             filterOptions: filterOptions,
@@ -181,189 +176,58 @@ class ByTagTreeRule extends BaseRule {
     }
 }
 
-class ByFormAndInputRule extends CompositeRule {
+class ByFormRule extends BaseRule {
     constructor () {
-        super(RULE_TYPE.byFormAndInput);
-
-        this.nameAttr = null;
-    }
-
-    _init (el) {
-        this.ancestor = domUtils.closest(el, 'form');
-        this.nameAttr = el.getAttribute('name');
+        super(RULE_TYPE.byForm);
     }
 
     _shouldGenerate (el) {
-        return domUtils.isInputElement(el) && !!this.nameAttr && this.ancestor;
-    }
-
-    _generateAncestorSelector () {
-        var byIdRule   = new ByIdRule();
-        var byAttrRule = new ByAttrRule();
-
-        this.ancestorSelector = byIdRule.generateSelector(this.ancestor) || byAttrRule.generateSelector(this.ancestor);
+        return domUtils.isFormElement(el);
     }
 
     _getSelector (el) {
-        var attributes = [{ name: 'name', value: this.nameAttr }];
-
-        return getAttributesSelector(el, attributes, this.ancestorSelector);
+        return rules.byIdRule.generate(el) || rules.byAttrRule.generate(el);
     }
 }
 
-class ByAncestorIdAndTextRule extends CompositeRule {
+class ByAncestorAndTagTreeRule extends BaseRule {
     constructor () {
-        super(RULE_TYPE.byIdAndText, ByIdRule);
-
-        this.text = null;
-    }
-
-    _init (el) {
-        this.ancestor = getAncestorWithId(el);
-        this.text     = getOwnTextForSelector(el);
+        super(RULE_TYPE.byAncestorAndTagTree);
     }
 
     _shouldGenerate (el) {
-        return hasOwnTextForSelector(el, this.text) && this.ancestor;
+        return !TAG_NAME_SELECTOR_ELEMENTS_RE.test(domUtils.getTagName(el));
     }
 
-    _generateAncestorSelector () {
-        this.ancestorSelector = this.ancestorRule.generateSelector(this.ancestor);
-    }
-
-    _getSelector (el) {
-        return new SelectorObject({
-            element:          el,
-            ancestorSelector: this.ancestorSelector,
-            selector:         domUtils.getTagName(el),
-            filterOptions:    new FilterOption(FILTER_OPTIONS_TYPES.text, this.text),
-            filter:           getTextFilter(this.text)
-        });
-    }
-}
-
-class ByAncestorIdAndAttrRule extends CompositeRule {
-    constructor () {
-        super(RULE_TYPE.byIdAndAttr, ByIdRule);
-
-        this.attributes = null;
-    }
-
-    _init (el) {
-        this.ancestor   = getAncestorWithId(el);
-        this.attributes = getAttributeNamesForSelector(el);
-    }
-
-    _shouldGenerate () {
-        return !!this.attributes.length && this.ancestor;
-    }
-
-    _generateAncestorSelector () {
-        this.ancestorSelector = this.ancestorRule.generateSelector(this.ancestor);
-    }
-
-    _getSelector (el) {
-        return getAttributesSelector(el, this.attributes, this.ancestorSelector);
-    }
-}
-
-class ByAncestorIdAndTagTreeRule extends CompositeRule {
-    constructor () {
-        super(RULE_TYPE.byIdAndTagTree, ByIdRule);
-    }
-
-    _init (el) {
-        this.ancestor = getAncestorWithId(el);
-    }
-
-    _shouldGenerate () {
-        return !!this.ancestor;
-    }
-
-    _generateAncestorSelector () {
-        this.ancestorSelector = this.ancestorRule.generateSelector(this.ancestor);
-    }
-
-    _getSelector (el) {
-        var filterOptions = getTagTreeFilterOptions(el, this.ancestor);
+    _getSelector (el, ancestorSelector) {
+        var filterOptions = getTagTreeFilterOptions(el, ancestorSelector.element);
 
         return new SelectorObject({
+            ruleType:         this.type,
             element:          el,
-            ancestorSelector: this.ancestorSelector,
+            ancestorSelector: ancestorSelector,
             filterOptions:    filterOptions,
             filter:           getTagTreeFilter(filterOptions)
         });
     }
 }
 
-class ByAncestorAttrAndTagTreeRule extends CompositeRule {
-    constructor () {
-        super(RULE_TYPE.byAttrAndTagTree, ByAttrRule);
-    }
 
-    _init (el) {
-        this.ancestor = getAncestorByRule(el, this.ancestorRule);
-    }
-
-    _shouldGenerate (el) {
-        return !TAG_NAME_SELECTOR_ELEMENTS_RE.test(domUtils.getTagName(el)) && this.ancestor;
-    }
-
-    _generateAncestorSelector () {
-        this.ancestorSelector = this.ancestorRule.generateSelector(this.ancestor);
-    }
-
-    _getSelector (el) {
-        var filterOptions = getTagTreeFilterOptions(el, this.ancestorSelector.element);
-
-        return new SelectorObject({
-            element:          el,
-            ancestorSelector: this.ancestorSelector,
-            filterOptions:    filterOptions,
-            filter:           getTagTreeFilter(filterOptions)
-        });
-    }
-}
-
-class ByAncestorTextAndTagTreeRule extends CompositeRule {
-    constructor () {
-        super(RULE_TYPE.byTextAndTagTree, ByTextRule);
-    }
-
-    _init (el) {
-        this.ancestor = getAncestorByRule(el, this.ancestorRule);
-    }
-
-    _shouldGenerate (el) {
-        return !TAG_NAME_SELECTOR_ELEMENTS_RE.test(domUtils.getTagName(el)) && this.ancestor;
-    }
-
-    _generateAncestorSelector () {
-        this.ancestorSelector = this.ancestorRule.generateSelector(this.ancestor);
-    }
-
-    _getSelector (el) {
-        var filterOptions = getTagTreeFilterOptions(el, this.ancestorSelector.element);
-
-        return new SelectorObject({
-            element:          el,
-            ancestorSelector: this.ancestorSelector,
-            filterOptions:    filterOptions,
-            filter:           getTagTreeFilter(filterOptions)
-        });
-    }
-}
-
-export default {
-    byTagRule:                    new ByTagRule(),
-    byIdRule:                     new ByIdRule(),
-    byTextRule:                   new ByTextRule(),
-    byAttrRule:                   new ByAttrRule(),
-    byTagTreeRule:                new ByTagTreeRule(),
-    byFormAndInputRule:           new ByFormAndInputRule(),
+var rules = {
+    byTagRule:                new ByTagRule(),
+    byNameAttr:               new ByNameAttr(),
+    byIdRule:                 new ByIdRule(),
+    byTextRule:               new ByTextRule(),
+    byAttrRule:               new ByAttrRule(),
+    byTagTreeRule:            new ByTagTreeRule(),
+    byFormRule:               new ByFormRule(),
+    byAncestorAndTagTreeRule: new ByAncestorAndTagTreeRule()
+    /*byFormAndInputRule:           new ByFormAndInputRule(),
     byAncestorIdAndTextRule:      new ByAncestorIdAndTextRule(),
     byAncestorIdAndAttrRule:      new ByAncestorIdAndAttrRule(),
     byAncestorIdAndTagTreeRule:   new ByAncestorIdAndTagTreeRule(),
     byAncestorAttrAndTagTreeRule: new ByAncestorAttrAndTagTreeRule(),
-    byAncestorTextAndTagTreeRule: new ByAncestorTextAndTagTreeRule()
+    byAncestorTextAndTagTreeRule: new ByAncestorTextAndTagTreeRule()*/
 };
+
+export default rules;

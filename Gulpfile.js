@@ -193,7 +193,7 @@ gulp.task('client-scripts', ['client-scripts-bundle'], function () {
                 .src(script.wrapper)
                 .pipe(mustache({ source: fs.readFileSync(script.src).toString() }))
                 .pipe(rename(path.basename(script.src)))
-                .pipe(gulpif(!util.env.dev, uglify()))
+                /*.pipe(gulpif(!util.env.dev, uglify()))*/
                 .pipe(gulp.dest(path.dirname(script.src)));
         }));
 });
@@ -230,7 +230,7 @@ gulp.task('client-scripts-bundle', ['clean'], function () {
             }
         }))
         .pipe(filterBrowserIdlePage)
-        .pipe(gulpif(!util.env.dev, uglify()))
+        /*.pipe(gulpif(!util.env.dev, uglify()))*/
         .pipe(filterBrowserIdlePage.restore)
         .pipe(gulp.dest('lib'));
 });
@@ -291,7 +291,7 @@ function testClient (tests, settings, sauselabsSettings) {
         .pipe(qunitHarness(settings, sauselabsSettings));
 }
 
-gulp.task('test-client', ['build'], function () {
+gulp.task('test-client', ['fast-build'], function () {
     return testClient('test/client/fixtures/**/*-test.js', CLIENT_TESTS_SETTINGS);
 });
 

@@ -1,6 +1,9 @@
 import { escapeRegExp as escapeRe } from 'lodash';
+import testCafeCore from '../../deps/testcafe-core';
 import filterNodeCollectionByText from '../../../driver/command-executors/client-functions/selector-executor/filter-by-text';
 import { FILTER_OPTIONS_TYPES } from '../selector-object';
+
+var arrayUtils = testCafeCore.arrayUtils;
 
 export function getAttributeRegExpFilter ({ attrName, attrValueRe }) {
     return elements => {
@@ -33,7 +36,7 @@ export function getTagTreeFilter (filterOptions) {
                 resElements = [resElements[filterOption.value]];
         }
 
-        return resElements;
+        return arrayUtils.toArray(resElements);
     };
 }
 

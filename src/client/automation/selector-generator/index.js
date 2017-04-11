@@ -1,29 +1,33 @@
-import { findIndex, sortBy } from 'lodash';
+import { find, findIndex, sortBy } from 'lodash';
 import testCafeCore from '../deps/testcafe-core';
 import rules from './rules';
-import { FILTER_OPTIONS_TYPES } from './selector-object';
-import { SELECTOR_INDEX_INDENT, calculateSelectorPriority } from './rules/priority';
+import RULE_TYPE from './rules/type';
+import { FILTER_OPTIONS_TYPES, FilterOption, SelectorObject } from './selector-object';
+import {
+    SELECTOR_INDEX_INDENT,
+    calculateSelectorPriority,
+    calculateRulesPriority
+} from './rules/priority';
+import { getAncestorByRule, isSimpleElementRule } from './rules/utils';
 
 var domUtils   = testCafeCore.domUtils;
 var arrayUtils = testCafeCore.arrayUtils;
 
+const ELEMENT_RULES = [
+    rules.byTagRule,
+    rules.byNameAttr,
+    rules.byIdRule,
+    rules.byTextRule,
+    rules.byAttrRule
+];
+
+const ANCESTOR_RULES = [rules.byIdRule, rules.byAttrRule, rules.byTextRule];
+
 export default class SelectorGenerator {
     constructor () {
-        this.rules = [
-            rules.byTagRule,
-            rules.byFormAndInputRule,
-            rules.byIdRule,
-            rules.byTextRule,
-            rules.byAttrRule,
-            rules.byAncestorIdAndTextRule,
-            rules.byAncestorIdAndAttrRule,
-            rules.byAncestorIdAndTagTreeRule,
-            rules.byAncestorAttrAndTagTreeRule,
-            rules.byAncestorTextAndTagTreeRule,
-            rules.byTagTreeRule
-        ];
-
-        this.selectorObjects = [];
+        this.selectorObjects              = [];
+        this.simpleElementSelectorObjects = [];
+        this.resultSelectorObject         = null;
     }
 
     static _filterOptionsToString (filterOptions = []) {
@@ -61,7 +65,9 @@ export default class SelectorGenerator {
         return string + SelectorGenerator._filterOptionsToString(selectorObject.filterOptions);
     }
 
-    static _getElementsBySelector (baseElement, { element, selector, filter }) {
+    static _getElementsBySelector ({ element, selector, filter }, baseElement) {
+        baseElement = baseElement || domUtils.findDocument(element);
+
         var elements = selector ? arrayUtils.toArray(baseElement.querySelectorAll(selector)) : [baseElement];
 
         elements = elements.length && filter ? filter(elements) : elements;
@@ -77,66 +83,125 @@ export default class SelectorGenerator {
     static _makeSelectorUnique (selectorObject, elements) {
         var elementIndex = elements.indexOf(selectorObject.element);
 
-        if (elements.length !== 1 && elementIndex !== 0) {
-            selectorObject.filterOptions.push({
-                type:  FILTER_OPTIONS_TYPES.index,
-                value: elementIndex
-            });
+        if (elements.length !== 1 && elementIndex !== 0)
+            selectorObject.filterOptions.push(new FilterOption(FILTER_OPTIONS_TYPES.index, elementIndex));
+    }
+
+    static _getAncestorSelector (el, ancestorRule) {
+        var ancestor         = getAncestorByRule(el, ancestorRule);
+        var ancestorSelector = ancestor ? ancestorRule.generate(ancestor) : null;
+        var elements         = ancestorSelector ? SelectorGenerator._getElementsBySelector(ancestorSelector) : [];
+
+        if (!elements.length)
+            return null;
+
+        SelectorGenerator._makeSelectorUnique(ancestorSelector, elements);
+
+        return ancestorSelector;
+    }
+
+    _storeSelectorObject (selectorObject, elements) {
+        if (!selectorObject.ancestorSelector && isSimpleElementRule(selectorObject.ruleType))
+            this.simpleElementSelectorObjects.push(selectorObject);
+
+        //TODO
+        var selectorObjectCopy = new SelectorObject(selectorObject);
+
+        SelectorGenerator._makeSelectorUnique(selectorObjectCopy, elements);
+
+        this.selectorObjects.push({
+            selectorString: SelectorGenerator._selectorObjectToString(selectorObjectCopy),
+            priority:       calculateSelectorPriority(selectorObject, elements)
+        });
+    }
+
+    checkSelectorObject (selectorObject) {
+        var ancestor = selectorObject.ancestorSelector ? selectorObject.ancestorSelector.element : null;
+        var elements = SelectorGenerator._getElementsBySelector(selectorObject, ancestor);
+
+        if (!elements.length)
+            return;
+
+        var rulesPriority = calculateRulesPriority(selectorObject);
+
+        if (elements.length === 1 && rulesPriority < SELECTOR_INDEX_INDENT) {
+            this.resultSelectorObject = selectorObject;
+            return;
+        }
+
+        this._storeSelectorObject(selectorObject, elements);
+    }
+
+    generateByAncestor (el, ancestorRules, elementSelectorObjects) {
+        for (var ancestorRule of ancestorRules) {
+            var ancestorSelectorObject = SelectorGenerator._getAncestorSelector(el, ancestorRule);
+
+            if (!ancestorSelectorObject)
+                continue;
+
+            for (var elementSelectorObject of elementSelectorObjects) {
+                //TODO
+                var selectorObject = new SelectorObject(elementSelectorObject);
+
+                selectorObject.ancestorSelector = ancestorSelectorObject;
+
+                this.checkSelectorObject(selectorObject);
+
+                if (this.resultSelectorObject)
+                    break;
+            }
+
+            if (this.resultSelectorObject)
+                break;
+
+            this.generateByRules(el, rules.byAncestorAndTagTreeRule, ancestorSelectorObject);
         }
     }
 
-    _addSelectorObject (selectorObject, priority) {
-        var selectorString    = SelectorGenerator._selectorObjectToString(selectorObject);
-        var selector          = { selectorString, priority };
-        var prevSelectorIndex = findIndex(this.selectorObjects, { selectorString });
+    generateByFormAncestor (el) {
+        var selectorByNameObject = find(this.simpleElementSelectorObjects, { ruleType: RULE_TYPE.byNameAttr });
 
-        if (prevSelectorIndex !== -1 && this.selectorObjects[prevSelectorIndex].priority > priority)
-            this.selectorObjects[prevSelectorIndex] = selector;
-        else
-            this.selectorObjects.push(selector);
+        if (selectorByNameObject)
+            this.generateByAncestor(el, [rules.byFormRule], [selectorByNameObject]);
+    }
+
+    generateByRules (el, rules, ancestorSelector) {
+        var selectorRules = [].concat(rules);
+
+        for (var rule of selectorRules) {
+            var selectorObject = rule.generate(el, ancestorSelector);
+
+            if (selectorObject) {
+                this.checkSelectorObject(selectorObject);
+
+                if (this.resultSelectorObject)
+                    break;
+            }
+        }
     }
 
     generate (el) {
         if (!el || !domUtils.isDomElement(el))
             return '';
 
-        this.selectorObjects = [];
+        this.selectorObjects              = [];
+        this.simpleElementSelectorObjects = [];
+        this.resultSelectorObject         = null;
 
-        for (var rule of this.rules) {
-            var selectorObject = rule.generateSelector(el);
+        this.generateByRules(el, ELEMENT_RULES);
 
-            if (selectorObject) {
-                var document        = domUtils.findDocument(el);
-                var ancestorElement = document;
-                var elements        = null;
+        if (!this.resultSelectorObject)
+            this.generateByFormAncestor(el);
 
-                if (selectorObject.ancestorSelector) {
-                    elements = SelectorGenerator._getElementsBySelector(document, selectorObject.ancestorSelector);
+        if (!this.resultSelectorObject)
+            this.generateByAncestor(el, ANCESTOR_RULES, this.simpleElementSelectorObjects);
 
-                    if (!elements.length)
-                        continue;
+        if (!this.resultSelectorObject)
+            this.generateByRules(el, rules.byTagTreeRule);
 
-                    SelectorGenerator._makeSelectorUnique(selectorObject.ancestorSelector, elements);
+        if (this.resultSelectorObject)
+            return SelectorGenerator._selectorObjectToString(this.resultSelectorObject);
 
-                    ancestorElement = selectorObject.ancestorSelector.element;
-                }
-
-                elements = SelectorGenerator._getElementsBySelector(ancestorElement, selectorObject);
-
-                if (!elements.length)
-                    continue;
-
-                SelectorGenerator._makeSelectorUnique(selectorObject, elements);
-
-                if (elements.length === 1 && rule.priority < SELECTOR_INDEX_INDENT)
-                    return SelectorGenerator._selectorObjectToString(selectorObject);
-
-                this._addSelectorObject(selectorObject, calculateSelectorPriority(rule, elements));
-            }
-        }
-
-        this.selectorObjects = sortBy(this.selectorObjects, 'priority');
-
-        return this.selectorObjects[0].selectorString;
+        return sortBy(this.selectorObjects, 'priority')[0].selectorString;
     }
 }
