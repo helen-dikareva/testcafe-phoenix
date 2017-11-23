@@ -9,8 +9,12 @@ var config         = require('./config.js');
 var site           = require('./site');
 var getTestError   = require('./get-test-error.js');
 
-var testCafe     = null;
-var browsersInfo = null;
+var testCafe           = null;
+var serverTestCafe     = null;
+var clientTestCafe     = null;
+var serverBrowsersInfo = null;
+var clientBrowsersInfo = null;
+var browsersInfo       = null;
 
 var connector        = null;
 var browserInstances = null;
@@ -34,7 +38,7 @@ config.browsers = environment.browsers;
 const REQUESTED_MACHINES_COUNT = environment.browsers.length;
 
 function getBrowserInfo (settings) {
-    return testCafe
+    return serverTestCafe
         .createBrowserConnection()
         .then(function (connection) {
             return {
@@ -48,11 +52,12 @@ function initBrowsersInfo () {
     return Promise
         .all(environment.browsers.map(getBrowserInfo))
         .then(function (info) {
-            browsersInfo = info;
+            serverBrowsersInfo = info;
+            clientBrowsersInfo = info;
         });
 }
 
-function openRemoteBrowsers () {
+/*function openRemoteBrowsers () {
     var Connector = isBrowserStack ? BsConnector : SlConnector;
 
     connector = new Connector(environment[browserProvider].username, environment[browserProvider].accessKey,
@@ -81,17 +86,24 @@ function openRemoteBrowsers () {
         .then(function (browsers) {
             browserInstances = browsers;
         });
-}
+}*/
 
 function openLocalBrowsers () {
-    var openBrowserPromises = browsersInfo.map(function (browserInfo) {
+    var openServerBrowserPromises = serverBrowsersInfo.map(function (browserInfo) {
         return browserTools.getBrowserInfo(browserInfo.settings.alias)
             .then(function (browser) {
                 return browserTools.open(browser, browserInfo.connection.url);
             });
     });
 
-    return Promise.all(openBrowserPromises);
+    var openClientBrowserPromises = clientBrowsersInfo.map(function (browserInfo) {
+        return browserTools.getBrowserInfo(browserInfo.settings.alias)
+            .then(function (browser) {
+                return browserTools.open(browser, browserInfo.connection.url);
+            });
+    });
+
+    return Promise.all([openServerBrowserPromises, openClientBrowserPromises]);
 }
 
 function closeRemoteBrowsers () {
@@ -106,19 +118,189 @@ function closeRemoteBrowsers () {
 }
 
 function closeLocalBrowsers () {
-    var closeBrowserPromises = browsersInfo.map(function (browserInfo) {
+    var closeServerBrowserPromises = serverBrowsersInfo.map(function (browserInfo) {
         return browserInfo.connection.getStatus().then(function (status) {
             return browserTools.close(status.url);
         });
     });
 
-    return Promise.all(closeBrowserPromises);
+    var closeClientBrowserPromises = clientBrowsersInfo.map(function (browserInfo) {
+        return browserInfo.connection.getStatus().then(function (status) {
+            return browserTools.close(status.url);
+        });
+    });
+
+    return Promise.all([closeServerBrowserPromises, closeClientBrowserPromises]);
 }
 
 before(function () {
     var mocha = this;
 
-    return createTestCafe(config.testCafe.hostname, config.testCafe.port1, config.testCafe.port2)
+    return createTestCafe('localhost', 1335, 1336)
+        .then(function (sTC) {
+            serverTestCafe = sTC;
+
+            return createTestCafe('localhost', 1337, 1338);
+        })
+        .then(function (cTC) {
+            clientTestCafe = cTC;
+
+            site.create(config.site.ports, config.site.viewsPath);
+
+            return initBrowsersInfo();
+        })
+        /*.then(function () {
+            return openLocalBrowsers();
+        })*/
+        .then(function () {
+            global.testReport = null;
+            global.testCafe   = serverTestCafe;
+
+            global.runTests = function (fixture, testName, opts) {
+                var report             = '';
+                var serverRunner       = serverTestCafe.createRunner('server');
+                var clientRunner       = clientTestCafe.createRunner('client');
+                var fixturePath        = path.isAbsolute(fixture) ? fixture : path.join(path.dirname(caller()), fixture);
+                var skipJsErrors       = opts && opts.skipJsErrors;
+                var quarantineMode     = opts && opts.quarantineMode;
+                var selectorTimeout    = opts && opts.selectorTimeout || FUNCTIONAL_TESTS_SELECTOR_TIMEOUT;
+                var assertionTimeout   = opts && opts.assertionTimeout || FUNCTIONAL_TESTS_ASSERTION_TIMEOUT;
+                var pageLoadTimeout    = opts && opts.pageLoadTimeout || FUNCTIONAL_TESTS_PAGE_LOAD_TIMEOUT;
+                var onlyOption         = opts && opts.only;
+                var skipOption         = opts && opts.skip;
+                var screenshotPath     = opts && opts.setScreenshotPath ? '___test-screenshots___' : '';
+                var screenshotsOnFails = opts && opts.screenshotsOnFails;
+                var speed              = opts && opts.speed;
+                var appCommand         = opts && opts.appCommand;
+                var appInitDelay       = opts && opts.appInitDelay;
+                var externalProxyHost  = opts && opts.useProxy;
+                var customReporters    = opts && opts.reporters;
+
+                var serverActualBrowsers = serverBrowsersInfo.filter(function (browserInfo) {
+                    var only = onlyOption ? onlyOption.indexOf(browserInfo.settings.alias) > -1 : true;
+                    var skip = skipOption ? skipOption.indexOf(browserInfo.settings.alias) > -1 : false;
+
+                    return only && !skip;
+                });
+
+                if (!serverActualBrowsers.length) {
+                    mocha.test.skip();
+                    return Promise.resolve();
+                }
+
+                var serverConnections = serverActualBrowsers.map(function (browserInfo) {
+                    return browserInfo.connection;
+                });
+
+                var clientActualBrowsers = clientBrowsersInfo.filter(function (browserInfo) {
+                    var only = onlyOption ? onlyOption.indexOf(browserInfo.settings.alias) > -1 : true;
+                    var skip = skipOption ? skipOption.indexOf(browserInfo.settings.alias) > -1 : false;
+
+                    return only && !skip;
+                });
+
+                if (!clientActualBrowsers.length) {
+                    mocha.test.skip();
+                    return Promise.resolve();
+                }
+
+                var clientConnections = clientActualBrowsers.map(function (browserInfo) {
+                    return browserInfo.connection;
+                });
+
+                var handleError = function (err) {
+                    var shouldFail = opts && opts.shouldFail;
+
+                    if (shouldFail && !err)
+                        throw new Error('Test should have failed but it succeeded');
+
+                    if (err)
+                        throw err;
+                };
+
+                if (customReporters)
+                    customReporters.forEach(r => serverRunner.reporter(r.reporter, r.outStream));
+                else {
+                    serverRunner.reporter('json', {
+                        write: function (data) {
+                            report += data;
+                        },
+
+                        end: function (data) {
+                            report += data;
+                        }
+                    });
+                }
+
+                //settings to serverRunner
+                serverRunner
+                    .useProxy(externalProxyHost)
+                    .browsers('chrome')
+                    .filter(function (test) {
+                        return testName ? test === testName : true;
+                    })
+                    .src(fixturePath)
+                    .screenshots(screenshotPath, screenshotsOnFails)
+                    .startApp(appCommand, appInitDelay);
+
+                //settings to clientRunner
+                clientRunner
+                    .browsers('chrome')
+                    .filter(function (test) {
+                        return testName ? test === testName : true;
+                    })
+                    .src(fixturePath);
+
+
+                //running
+                clientRunner
+                    .run()
+                    .then(failedCount => {
+                        console.log('!client!');
+                        console.log('SUCCSESS: ' + failedCount);
+                    })
+                    .catch(error => {
+                        console.log('!client!');
+                        console.log('FAILED');
+                        console.log(error);
+                    });
+
+
+                return serverRunner
+                    .run({
+                        skipJsErrors:     skipJsErrors,
+                        quarantineMode:   quarantineMode,
+                        selectorTimeout:  selectorTimeout,
+                        assertionTimeout: assertionTimeout,
+                        pageLoadTimeout:  pageLoadTimeout,
+                        speed:            speed
+                    })
+                    .then(function () {
+                        console.log('1');
+                        /*if (customReporters)
+                            return;
+
+                        var taskReport = JSON.parse(report);
+                        var errorDescr = getTestError(taskReport, actualBrowsers);
+                        var testReport = taskReport.fixtures.length === 1 ?
+                                         taskReport.fixtures[0].tests[0] :
+                                         taskReport;
+
+                        testReport.warnings = taskReport.warnings;
+
+                        global.testReport = testReport;
+
+                        handleError(errorDescr);*/
+                    })
+                    .catch(function (err) {
+                        console.log('2');
+                        /*handleError(err);*/
+                    });
+            };
+        })
+
+
+    /*return createTestCafe(config.testCafe.hostname, config.testCafe.port1, config.testCafe.port2)
         .then(function (tc) {
             testCafe = tc;
 
@@ -242,13 +424,14 @@ before(function () {
                     })
                     .catch(handleError);
             };
-        });
+        });*/
 });
 
 after(function () {
     this.timeout(60000);
 
-    testCafe.close();
+    serverTestCafe.close();
+    clientTestCafe.close();
     site.destroy();
 
     delete global.testcafe;

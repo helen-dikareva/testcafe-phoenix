@@ -54,8 +54,8 @@ export default class TestCafe {
         return new BrowserConnection(this.browserConnectionGateway, browserInfo, true);
     }
 
-    createRunner () {
-        var newRunner = new Runner(this.proxy, this.browserConnectionGateway);
+    createRunner (position) {
+        var newRunner = new Runner(this.proxy, this.browserConnectionGateway, position);
 
         this.runners.push(newRunner);
 

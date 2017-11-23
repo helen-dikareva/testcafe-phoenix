@@ -7,12 +7,13 @@ import TestRun from '../test-run';
 const QUARANTINE_THRESHOLD = 3;
 
 export default class TestRunController extends EventEmitter {
-    constructor (test, index, proxy, screenshots, warningLog, fixtureHookController, opts) {
+    constructor (test, index, proxy, screenshots, warningLog, fixtureHookController, opts, position) {
         super();
 
-        this.test  = test;
-        this.index = index;
-        this.opts  = opts;
+        this.position = position;
+        this.test     = test;
+        this.index    = index;
+        this.opts     = opts;
 
         this.proxy                 = proxy;
         this.screenshots           = screenshots;
@@ -47,7 +48,7 @@ export default class TestRunController extends EventEmitter {
         var screenshotCapturer   = this.screenshots.createCapturerFor(this.test, this.index, quarantineAttemptNum, connection);
         var TestRunCtor          = this.TestRunCtor;
 
-        this.testRun = new TestRunCtor(this.test, connection, screenshotCapturer, this.warningLog, this.opts);
+        this.testRun = new TestRunCtor(this.test, connection, screenshotCapturer, this.warningLog, this.opts, this.position);
 
         return this.testRun;
     }

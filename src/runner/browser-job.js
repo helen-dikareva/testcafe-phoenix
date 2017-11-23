@@ -7,7 +7,7 @@ import RESULT from './browser-job-result';
 
 // Browser job
 export default class BrowserJob extends EventEmitter {
-    constructor (tests, browserConnections, proxy, screenshots, warningLog, fixtureHookController, opts) {
+    constructor (tests, browserConnections, proxy, screenshots, warningLog, fixtureHookController, opts, position) {
         super();
 
         this.started = false;
@@ -21,8 +21,10 @@ export default class BrowserJob extends EventEmitter {
         this.warningLog            = warningLog;
         this.fixtureHookController = fixtureHookController;
         this.result                = null;
+        this.position              = position;
 
         this.testRunControllerQueue = tests.map((test, index) => this._createTestRunController(test, index));
+
 
         this.completionQueue = [];
 
@@ -33,7 +35,7 @@ export default class BrowserJob extends EventEmitter {
 
     _createTestRunController (test, index) {
         var testRunController = new TestRunController(test, index + 1, this.proxy, this.screenshots, this.warningLog,
-            this.fixtureHookController, this.opts);
+            this.fixtureHookController, this.opts, this.position);
 
         testRunController.on('test-run-start', () => this.emit('test-run-start', testRunController.testRun));
         testRunController.on('test-run-restart', () => this._onTestRunRestart(testRunController));

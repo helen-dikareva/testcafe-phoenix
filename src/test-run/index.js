@@ -44,6 +44,8 @@ import {
     canSetDebuggerBreakpointBeforeCommand
 } from './commands/utils';
 
+import { sendToServer, setServerRequestHandler } from '../messaging';
+
 //Const
 const TEST_RUN_TEMPLATE               = read('../client/test-run/index.js.mustache');
 const IFRAME_TEST_RUN_TEMPLATE        = read('../client/test-run/iframe.js.mustache');
@@ -52,16 +54,30 @@ const MAX_RESPONSE_DELAY              = 2 * 60 * 1000;
 
 
 export default class TestRun extends Session {
-    constructor (test, browserConnection, screenshotCapturer, warningLog, opts) {
+    constructor (test, browserConnection, screenshotCapturer, warningLog, opts, position) {
         var uploadsRoot = path.dirname(test.fixture.path);
 
         super(uploadsRoot);
 
         this[testRunMarker] = true;
 
+        this.position          = position;
         this.opts              = opts;
         this.test              = test;
         this.browserConnection = browserConnection;
+
+        if (this.position === 'client') {
+            setServerRequestHandler('sendCommand', res => this._enqueueCommand(res.command, res.callsite, true));
+            setServerRequestHandler('testDone', async () => {
+                await this.executeCommand(new TestDoneCommand(), void 0, true);
+
+                this._addPendingPageErrorIfAny();
+
+                delete testRunTracker.activeTestRuns[this.id];
+
+                this.emit('done');
+            });
+        }
 
         this.phase = PHASE.initial;
 
@@ -208,20 +224,28 @@ export default class TestRun extends Session {
 
         this.emit('start');
 
+        //TODO
         if (await this._runBeforeHook()) {
-            await this._executeTestFn(PHASE.inTest, this.test.fn);
+            if (!this.test.fn)
+                await this._executeTestFn(PHASE.inTest, () => {
+                });
+            else
+                await this._executeTestFn(PHASE.inTest, this.test.fn);
             await this._runAfterHook();
         }
 
         if (this.errs.length && this.debugOnFail)
             await this._enqueueSetBreakpointCommand(null, this.debugReporterPluginHost.formatError(this.errs[0]));
 
-        await this.executeCommand(new TestDoneCommand());
-        this._addPendingPageErrorIfAny();
+        if (this.position !== 'client') {
+            await sendToServer({ type: 'testDone' });
+            await this.executeCommand(new TestDoneCommand(), void 0, true);
+            this._addPendingPageErrorIfAny();
 
-        delete testRunTracker.activeTestRuns[this.id];
+            delete testRunTracker.activeTestRuns[this.id];
 
-        this.emit('done');
+            this.emit('done');
+        }
     }
 
     _evaluate (code) {
@@ -259,11 +283,23 @@ export default class TestRun extends Session {
     }
 
     // Task queue
-    _enqueueCommand (command, callsite) {
-        if (this.pendingRequest)
-            this._resolvePendingRequest(command);
+    _enqueueCommand (command, callsite, force) {
+        if (this.position === 'server' && command.type !== COMMAND_TYPE.testDone) {
+            return sendToServer({
+                type: 'sendCommand',
 
-        return new Promise((resolve, reject) => this.driverTaskQueue.push({ command, resolve, reject, callsite }));
+                command,
+                callsite
+            });
+        }
+        else if (force) {
+            if (this.pendingRequest)
+                this._resolvePendingRequest(command);
+
+            return new Promise((resolve, reject) => this.driverTaskQueue.push({ command, resolve, reject, callsite }));
+        }
+        else
+            return new Promise.resolve();
     }
 
     _enqueueBrowserManipulation (command, callsite) {
@@ -408,7 +444,7 @@ export default class TestRun extends Session {
             await this._enqueueSetBreakpointCommand(callsite);
     }
 
-    async executeCommand (command, callsite) {
+    async executeCommand (command, callsite, force) {
         this.debugLog.command(command);
 
         if (this.pendingPageError && isCommandRejectableByPageError(command))
@@ -416,7 +452,8 @@ export default class TestRun extends Session {
 
         this._adjustConfigurationWithCommand(command);
 
-        await this._setBreakpointIfNecessary(command, callsite);
+        await
+            this._setBreakpointIfNecessary(command, callsite);
 
         if (isBrowserManipulationCommand(command))
             return this._enqueueBrowserManipulation(command, callsite);
@@ -428,18 +465,21 @@ export default class TestRun extends Session {
             return null;
 
         if (command.type === COMMAND_TYPE.debug)
-            return await this._enqueueSetBreakpointCommand(callsite);
+            return await
+                this._enqueueSetBreakpointCommand(callsite);
 
         if (command.type === COMMAND_TYPE.useRole)
-            return await this._useRole(command.role, callsite);
+            return await
+                this._useRole(command.role, callsite);
 
         if (command.type === COMMAND_TYPE.assertion)
             return this._executeAssertion(command, callsite);
 
         if (command.type === COMMAND_TYPE.getBrowserConsoleMessages)
-            return await this._enqueueBrowserConsoleMessagesCommand(command, callsite);
+            return await
+                this._enqueueBrowserConsoleMessagesCommand(command, callsite);
 
-        return this._enqueueCommand(command, callsite);
+        return this._enqueueCommand(command, callsite, force);
     }
 
     _rejectCommandWithPageError (callsite) {
@@ -451,11 +491,12 @@ export default class TestRun extends Session {
         return Promise.reject(err);
     }
 
-    // Role management
+// Role management
     async getStateSnapshot () {
         var state = super.getStateSnapshot();
 
-        state.storages = await this.executeCommand(new BackupStoragesCommand());
+        state.storages = await
+            this.executeCommand(new BackupStoragesCommand());
 
         return state;
     }
@@ -470,19 +511,22 @@ export default class TestRun extends Session {
         if (this.activeDialogHandler) {
             var removeDialogHandlerCommand = new SetNativeDialogHandlerCommand({ dialogHandler: { fn: null } });
 
-            await this.executeCommand(removeDialogHandlerCommand);
+            await
+                this.executeCommand(removeDialogHandlerCommand);
         }
 
         if (this.speed !== this.opts.speed) {
             var setSpeedCommand = new SetTestSpeedCommand({ speed: this.opts.speed });
 
-            await this.executeCommand(setSpeedCommand);
+            await
+                this.executeCommand(setSpeedCommand);
         }
 
         if (this.pageLoadTimeout !== this.opts.pageLoadTimeout) {
             var setPageLoadTimeoutCommand = new SetPageLoadTimeoutCommand({ duration: this.opts.pageLoadTimeout });
 
-            await this.executeCommand(setPageLoadTimeoutCommand);
+            await
+                this.executeCommand(setPageLoadTimeoutCommand);
         }
     }
 
@@ -492,10 +536,12 @@ export default class TestRun extends Session {
         this.phase = PHASE.inRoleInitializer;
 
         if (role.phase === ROLE_PHASE.uninitialized)
-            await role.initialize(this);
+            await
+                role.initialize(this);
 
         else if (role.phase === ROLE_PHASE.pendingInitialization)
-            await promisifyEvent(role, 'initialized');
+            await
+                promisifyEvent(role, 'initialized');
 
         if (role.initErr)
             throw role.initErr;
@@ -513,24 +559,28 @@ export default class TestRun extends Session {
 
         var bookmark = new TestRunBookmark(this, role);
 
-        await bookmark.init();
+        await
+            bookmark.init();
 
         if (this.currentRoleId)
-            this.usedRoleStates[this.currentRoleId] = await this.getStateSnapshot();
+            this.usedRoleStates[this.currentRoleId] = await
+                this.getStateSnapshot();
 
-        var stateSnapshot = this.usedRoleStates[role.id] || await this._getStateSnapshotFromRole(role);
+        var stateSnapshot = this.usedRoleStates[role.id] || await
+            this._getStateSnapshotFromRole(role);
 
         this.useStateSnapshot(stateSnapshot);
 
         this.currentRoleId = role.id;
 
-        await bookmark.restore(callsite);
+        await
+            bookmark.restore(callsite);
 
         this.disableDebugBreakpoints = false;
     }
 
 
-    // Get current URL
+// Get current URL
     async getCurrentUrl () {
         var builder = new ClientFunctionBuilder(() => {
             /* eslint-disable no-undef */
@@ -540,7 +590,8 @@ export default class TestRun extends Session {
 
         var getLocation = builder.getFunction();
 
-        return await getLocation();
+        return await
+            getLocation();
     }
 }
 

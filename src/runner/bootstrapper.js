@@ -134,7 +134,7 @@ export default class Bootstrapper {
 
 
     // API
-    async createRunnableConfiguration () {
+    async createRunnableConfiguration (parsedTests) {
         var reporterPlugins = this._getReporterPlugins();
 
         // NOTE: If a user forgot to specify a browser, but has specified a path to tests, the specified path will be
@@ -142,7 +142,7 @@ export default class Bootstrapper {
         // It's very ambiguous for the user, who might be confused by compilation errors from an unexpected test.
         // So, we need to retrieve the browser aliases and paths before tests compilation.
         var browserInfo = await this._getBrowserInfo();
-        var tests       = await this._getTests();
+        var tests       = parsedTests || await this._getTests();
         var testedApp   = await this._startTestedApp();
         var browserSet  = await this._getBrowserConnections(browserInfo);
 

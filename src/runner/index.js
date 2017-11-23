@@ -9,7 +9,8 @@ import Reporter from '../reporter';
 import Task from './task';
 import { GeneralError } from '../errors/runtime';
 import MESSAGE from '../errors/runtime/message';
-
+import { implementServer, sendToServer, setServerRequestHandler } from '../messaging';
+import clone from './clone';
 
 const DEFAULT_SELECTOR_TIMEOUT  = 10000;
 const DEFAULT_ASSERTION_TIMEOUT = 3000;
@@ -17,8 +18,10 @@ const DEFAULT_PAGE_LOAD_TIMEOUT = 3000;
 
 
 export default class Runner extends EventEmitter {
-    constructor (proxy, browserConnectionGateway) {
+    constructor (proxy, browserConnectionGateway, position) {
         super();
+
+        this.position = position;
 
         this.proxy               = proxy;
         this.bootstrapper        = new Bootstrapper(browserConnectionGateway);
@@ -34,6 +37,19 @@ export default class Runner extends EventEmitter {
             selectorTimeout:        DEFAULT_SELECTOR_TIMEOUT,
             pageLoadTimeout:        DEFAULT_PAGE_LOAD_TIMEOUT
         };
+
+        if (this.position === 'client') {
+            implementServer();
+
+            setServerRequestHandler('setTests', res => {
+                //TODO
+                return new Promise(resolve => {
+                    this.run({}, res.tests);
+
+                    setTimeout(resolve, 10000);
+                });
+            });
+        }
     }
 
     static async _disposeTaskAndRelatedAssets (task, browserSet, testedApp) {
@@ -94,7 +110,7 @@ export default class Runner extends EventEmitter {
 
     _runTask (reporterPlugins, browserSet, tests, testedApp) {
         var completed         = false;
-        var task              = new Task(tests, browserSet.browserConnectionGroups, this.proxy, this.opts);
+        var task              = new Task(tests, browserSet.browserConnectionGroups, this.proxy, this.opts, this.position);
         var reporters         = reporterPlugins.map(reporter => new Reporter(reporter.plugin, task, reporter.outStream));
         var completionPromise = this._getTaskResult(task, browserSet, reporters[0], testedApp);
 
@@ -185,7 +201,7 @@ export default class Runner extends EventEmitter {
         return this;
     }
 
-    run ({ skipJsErrors, quarantineMode, debugMode, selectorTimeout, assertionTimeout, pageLoadTimeout, speed = 1, debugOnFail } = {}) {
+    run ({ skipJsErrors, quarantineMode, debugMode, selectorTimeout, assertionTimeout, pageLoadTimeout, speed = 1, debugOnFail } = {}, tests) {
         this.opts.skipJsErrors     = !!skipJsErrors;
         this.opts.quarantineMode   = !!quarantineMode;
         this.opts.debugMode        = !!debugMode;
@@ -199,11 +215,16 @@ export default class Runner extends EventEmitter {
 
         this.opts.speed = speed;
 
-        var runTaskPromise = this.bootstrapper.createRunnableConfiguration()
+        var runTaskPromise = this.bootstrapper.createRunnableConfiguration(tests)
             .then(({ reporterPlugins, browserSet, tests, testedApp }) => {
                 this.emit('done-bootstrapping');
 
-                return this._runTask(reporterPlugins, browserSet, tests, testedApp);
+                if (this.position === 'server') {
+                    return sendToServer({ type: 'setTests', tests: clone(tests) })
+                        .then(() => this._runTask(reporterPlugins, browserSet, tests, testedApp));
+                }
+                else
+                    return this._runTask(reporterPlugins, browserSet, tests, testedApp);
             });
 
         return this._createCancelablePromise(runTaskPromise);

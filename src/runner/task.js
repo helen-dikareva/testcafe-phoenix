@@ -6,9 +6,10 @@ import WarningLog from '../notifications/warning-log';
 import FixtureHookController from './fixture-hook-controller';
 
 export default class Task extends EventEmitter {
-    constructor (tests, browserConnectionGroups, proxy, opts) {
+    constructor (tests, browserConnectionGroups, proxy, opts, position) {
         super();
 
+        this.position                = position;
         this.running                 = false;
         this.browserConnectionGroups = browserConnectionGroups;
         this.tests                   = tests;
@@ -41,7 +42,7 @@ export default class Task extends EventEmitter {
 
     _createBrowserJobs (proxy, opts) {
         return this.browserConnectionGroups.map(browserConnectionGroup => {
-            var job = new BrowserJob(this.tests, browserConnectionGroup, proxy, this.screenshots, this.warningLog, this.fixtureHookController, opts);
+            var job = new BrowserJob(this.tests, browserConnectionGroup, proxy, this.screenshots, this.warningLog, this.fixtureHookController, opts, this.position);
 
             this._assignBrowserJobEventHandlers(job);
             browserConnectionGroup.map(bc => bc.addJob(job));
