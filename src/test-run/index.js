@@ -224,20 +224,17 @@ export default class TestRun extends Session {
 
         this.emit('start');
 
-        //TODO
-        if (await this._runBeforeHook()) {
-            if (!this.test.fn)
-                await this._executeTestFn(PHASE.inTest, () => {
-                });
-            else
+        // NOTE: we do not execute test functions on client we just wait for command to execute in browser
+        if (this.position === 'server') {
+            if (await this._runBeforeHook()) {
                 await this._executeTestFn(PHASE.inTest, this.test.fn);
-            await this._runAfterHook();
-        }
 
-        if (this.errs.length && this.debugOnFail)
-            await this._enqueueSetBreakpointCommand(null, this.debugReporterPluginHost.formatError(this.errs[0]));
+                await this._runAfterHook();
+            }
 
-        if (this.position !== 'client') {
+            if (this.errs.length && this.debugOnFail)
+                await this._enqueueSetBreakpointCommand(null, this.debugReporterPluginHost.formatError(this.errs[0]));
+
             await sendToServer({ type: 'testDone' });
             await this.executeCommand(new TestDoneCommand(), void 0, true);
             this._addPendingPageErrorIfAny();
