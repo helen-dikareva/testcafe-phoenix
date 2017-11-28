@@ -7,7 +7,7 @@ import RESULT from './browser-job-result';
 
 // Browser job
 export default class BrowserJob extends EventEmitter {
-    constructor (tests, browserConnections, proxy, screenshots, warningLog, fixtureHookController, opts, position) {
+    constructor (tests, browserConnections, proxy, screenshots, warningLog, fixtureHookController, opts, position, callback) {
         super();
 
         this.started = false;
@@ -22,6 +22,7 @@ export default class BrowserJob extends EventEmitter {
         this.fixtureHookController = fixtureHookController;
         this.result                = null;
         this.position              = position;
+        this.callback              = callback;
 
         this.testRunControllerQueue = tests.map((test, index) => this._createTestRunController(test, index));
 
@@ -108,7 +109,7 @@ export default class BrowserJob extends EventEmitter {
                 this.emit('start');
             }
 
-            var testRunUrl = await testRunController.start(connection);
+            var testRunUrl = await testRunController.start(connection, this.callback);
 
             if (testRunUrl)
                 return testRunUrl;

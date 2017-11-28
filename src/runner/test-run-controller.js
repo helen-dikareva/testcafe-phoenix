@@ -111,8 +111,11 @@ export default class TestRunController extends EventEmitter {
         return this.fixtureHookController.isTestBlocked(this.test);
     }
 
-    async start (connection) {
+    async start (connection, callback) {
         var testRun = this._createTestRun(connection);
+
+        if (callback)
+            callback();
 
         var hookOk = await this.fixtureHookController.runFixtureBeforeHookIfNecessary(testRun);
 

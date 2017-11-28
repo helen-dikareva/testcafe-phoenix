@@ -6,7 +6,7 @@ import WarningLog from '../notifications/warning-log';
 import FixtureHookController from './fixture-hook-controller';
 
 export default class Task extends EventEmitter {
-    constructor (tests, browserConnectionGroups, proxy, opts, position) {
+    constructor (tests, browserConnectionGroups, proxy, opts, position, callback) {
         super();
 
         this.position                = position;
@@ -17,7 +17,7 @@ export default class Task extends EventEmitter {
         this.warningLog              = new WarningLog();
 
         this.fixtureHookController = new FixtureHookController(tests, browserConnectionGroups.length);
-        this.pendingBrowserJobs    = this._createBrowserJobs(proxy, opts);
+        this.pendingBrowserJobs    = this._createBrowserJobs(proxy, opts, callback);
     }
 
     _assignBrowserJobEventHandlers (job) {
@@ -40,9 +40,9 @@ export default class Task extends EventEmitter {
         });
     }
 
-    _createBrowserJobs (proxy, opts) {
+    _createBrowserJobs (proxy, opts, callback) {
         return this.browserConnectionGroups.map(browserConnectionGroup => {
-            var job = new BrowserJob(this.tests, browserConnectionGroup, proxy, this.screenshots, this.warningLog, this.fixtureHookController, opts, this.position);
+            var job = new BrowserJob(this.tests, browserConnectionGroup, proxy, this.screenshots, this.warningLog, this.fixtureHookController, opts, this.position, callback);
 
             this._assignBrowserJobEventHandlers(job);
             browserConnectionGroup.map(bc => bc.addJob(job));
