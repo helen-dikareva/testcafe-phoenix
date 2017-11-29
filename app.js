@@ -28,7 +28,7 @@ createTestCafe('localhost', 1335, 1336)
             });
 
         return serverRunner
-            .src(['./tests/test.js', './tests/assertion-test.js'])
+            .src(['./tests/test.js', './tests/assertion-test.js', './tests/local-test.js'])
             .browsers('chrome')
             .run();
     })

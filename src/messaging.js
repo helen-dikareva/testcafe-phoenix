@@ -17,9 +17,20 @@ export function implementServer () {
 
         req.on('end', async () => {
             const { type } = JSON.parse(body);
-            const response = await serverRequestHandlers[type](JSON.parse(body));
 
-            res.end(JSON.stringify(response));
+            return serverRequestHandlers[type](JSON.parse(body))
+                .then(response => {
+                    res.end(JSON.stringify({
+                        res: response,
+                        err: null
+                    }));
+                })
+                .catch(err => {
+                    res.end(JSON.stringify({
+                        res: null,
+                        err: err
+                    }));
+                });
         });
     });
 
@@ -31,7 +42,7 @@ export function setServerRequestHandler (type, handler) {
 }
 
 export function sendToServer (data) {
-    return new Promise(function (resolve) {
+    return new Promise((resolve, reject) => {
         const postData = JSON.stringify(data);
 
         const post_req = http.request({
@@ -50,7 +61,17 @@ export function sendToServer (data) {
                 body += chunk;
             });
             res.on('end', () => {
-                resolve(body ? JSON.parse(body) : '');
+                if (!body)
+                    resolve('');
+
+                const { res, err } = JSON.parse(body);
+
+                if (err){
+                    delete err.callsite;
+                    reject(err);
+                }
+
+                resolve(res);
             });
         });
 

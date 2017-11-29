@@ -157,6 +157,7 @@ before(function () {
             global.testCafe   = serverTestCafe;
 
             global.runTests = function (fixture, testName, opts) {
+
                 var report             = '';
                 var serverRunner       = serverTestCafe.createRunner('server');
                 var clientRunner       = clientTestCafe.createRunner('client');
@@ -251,21 +252,7 @@ before(function () {
                     })
                     .src(fixturePath);
 
-
                 //running
-                clientRunner
-                    .run()
-                    .then(failedCount => {
-                        console.log('!client!');
-                        console.log('SUCCSESS: ' + failedCount);
-                    })
-                    .catch(error => {
-                        console.log('!client!');
-                        console.log('FAILED');
-                        console.log(error);
-                    });
-
-
                 return serverRunner
                     .run({
                         skipJsErrors:     skipJsErrors,
@@ -276,12 +263,11 @@ before(function () {
                         speed:            speed
                     })
                     .then(function () {
-                        console.log('1');
-                        /*if (customReporters)
+                        if (customReporters)
                             return;
 
                         var taskReport = JSON.parse(report);
-                        var errorDescr = getTestError(taskReport, actualBrowsers);
+                        var errorDescr = getTestError(taskReport, serverActualBrowsers);
                         var testReport = taskReport.fixtures.length === 1 ?
                                          taskReport.fixtures[0].tests[0] :
                                          taskReport;
@@ -290,11 +276,11 @@ before(function () {
 
                         global.testReport = testReport;
 
-                        handleError(errorDescr);*/
+                        handleError(errorDescr);
                     })
                     .catch(function (err) {
                         console.log('2');
-                        /*handleError(err);*/
+                        handleError(err);
                     });
             };
         })
