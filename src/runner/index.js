@@ -9,7 +9,7 @@ import Reporter from '../reporter';
 import Task from './task';
 import { GeneralError } from '../errors/runtime';
 import MESSAGE from '../errors/runtime/message';
-import { implementServer, sendToServer, setServerRequestHandler } from '../messaging';
+import { implementServer, sendToServer, setServerRequestHandler, destroyServer } from '../messaging';
 import clone from 'safe-clone-deep';
 
 const DEFAULT_SELECTOR_TIMEOUT  = 10000;
@@ -222,6 +222,16 @@ export default class Runner extends EventEmitter {
                 }
                 else
                     return this._runTask(reporterPlugins, browserSet, tests, testedApp, callback);
+            })
+            .then(results => {
+                if (this.position === 'client')
+                    destroyServer();
+                return results;
+            })
+            .catch(errors => {
+                if (this.position === 'client')
+                    destroyServer();
+                return errors;
             });
 
         return this._createCancelablePromise(runTaskPromise);

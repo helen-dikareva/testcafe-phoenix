@@ -96,14 +96,14 @@ function openLocalBrowsers () {
             });
     });
 
-    var openClientBrowserPromises = clientBrowsersInfo.map(function (browserInfo) {
+    /*var openClientBrowserPromises = clientBrowsersInfo.map(function (browserInfo) {
         return browserTools.getBrowserInfo(browserInfo.settings.alias)
             .then(function (browser) {
                 return browserTools.open(browser, browserInfo.connection.url);
             });
-    });
+    });*/
 
-    return Promise.all([openServerBrowserPromises, openClientBrowserPromises]);
+    return Promise.all(openServerBrowserPromises);
 }
 
 function closeRemoteBrowsers () {
@@ -149,15 +149,14 @@ before(function () {
 
             return initBrowsersInfo();
         })
-        /*.then(function () {
+        .then(function () {
             return openLocalBrowsers();
-        })*/
+        })
         .then(function () {
             global.testReport = null;
             global.testCafe   = serverTestCafe;
 
             global.runTests = function (fixture, testName, opts) {
-
                 var report             = '';
                 var serverRunner       = serverTestCafe.createRunner('server');
                 var clientRunner       = clientTestCafe.createRunner('client');
@@ -193,7 +192,7 @@ before(function () {
                     return browserInfo.connection;
                 });
 
-                var clientActualBrowsers = clientBrowsersInfo.filter(function (browserInfo) {
+                /*var clientActualBrowsers = clientBrowsersInfo.filter(function (browserInfo) {
                     var only = onlyOption ? onlyOption.indexOf(browserInfo.settings.alias) > -1 : true;
                     var skip = skipOption ? skipOption.indexOf(browserInfo.settings.alias) > -1 : false;
 
@@ -207,7 +206,7 @@ before(function () {
 
                 var clientConnections = clientActualBrowsers.map(function (browserInfo) {
                     return browserInfo.connection;
-                });
+                });*/
 
                 var handleError = function (err) {
                     var shouldFail = opts && opts.shouldFail;
@@ -236,7 +235,7 @@ before(function () {
                 //settings to serverRunner
                 serverRunner
                     .useProxy(externalProxyHost)
-                    .browsers('chrome')
+                    .browsers(serverConnections)
                     .filter(function (test) {
                         return testName ? test === testName : true;
                     })
@@ -250,7 +249,14 @@ before(function () {
                     .filter(function (test) {
                         return testName ? test === testName : true;
                     })
-                    .src(fixturePath);
+                    .src(fixturePath)
+                    .reporter('json', {
+                        write: function () {
+                        },
+
+                        end: function () {
+                        }
+                    });
 
                 //running
                 return serverRunner

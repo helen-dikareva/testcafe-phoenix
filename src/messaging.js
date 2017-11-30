@@ -1,9 +1,11 @@
 import http from 'http';
 
 const serverRequestHandlers = {};
+let sockets                 = [];
+let server                  = null;
 
 export function implementServer () {
-    const server = http.createServer((req, res) => {
+    server = http.createServer((req, res) => {
         let body = '';
 
         req.on('data', data => {
@@ -35,6 +37,18 @@ export function implementServer () {
     });
 
     server.listen(1888);
+
+    const handler = socket => {
+        sockets.push(socket);
+        socket.on('close', () => sockets.splice(sockets.indexOf(socket), 1));
+    };
+
+    server.on('connection', handler);
+}
+
+export function destroyServer () {
+    server.close();
+    sockets.forEach(socket => socket.destroy());
 }
 
 export function setServerRequestHandler (type, handler) {
@@ -66,7 +80,7 @@ export function sendToServer (data) {
 
                 const { res, err } = JSON.parse(body);
 
-                if (err){
+                if (err) {
                     delete err.callsite;
                     reject(err);
                 }
