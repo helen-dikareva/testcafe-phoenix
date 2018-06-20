@@ -10,11 +10,16 @@ export default class RawTestFileCompiler extends TestFileCompilerBase {
     static _createTestFn (commands) {
         return async t => {
             for (var i = 0; i < commands.length; i++) {
-                var callsite = commands[i] && commands[i].callsite;
-                var command  = null;
+                var commandObj = commands[i];
+                var callsite   = commandObj && commandObj.callsite;
+                var command    = null;
 
+                commandObj.executionContext = t.testRun.executionContext;
+
+                debugger;
                 try {
-                    command = createCommandFromObject(commands[i]);
+                    command = createCommandFromObject(commandObj);
+
                     await t.testRun.executeCommand(command, callsite);
                 }
                 catch (err) {

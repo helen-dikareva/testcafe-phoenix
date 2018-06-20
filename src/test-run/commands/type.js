@@ -43,4 +43,5 @@ export default {
     useRole:                    'useRole',
     testDone:                   'test-done',
     backupStorages:             'backup-storages',
+    testCode:                   'test-code'
 };

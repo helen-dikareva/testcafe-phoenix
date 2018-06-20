@@ -1,0 +1,29 @@
+{
+    "fixtures": [
+        {
+            "name": "Code execution",
+            "pageUrl": "http://localhost/testcafe",
+            "tests": [
+                {
+                    "name": "Test",
+                    "commands": [
+                        {
+                            "type": "test-code",
+                            "code": "var a = '123';"
+                        },
+                        {
+                            "type": "click",
+                            "selector": "body"
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "eql",
+                            "actual": { "type" : "js-expr", "value" : "a" },
+                            "expected": "123"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

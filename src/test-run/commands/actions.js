@@ -59,8 +59,8 @@ function initDialogHandler (name, val) {
         throw new SetNativeDialogHandlerCodeWrongTypeError(isSelector ? 'Selector' : functionType);
 
     builder = builder instanceof ClientFunctionBuilder ?
-        fn.with(options)[functionBuilderSymbol] :
-        new ClientFunctionBuilder(fn, options, { instantiation: methodName, execution: methodName });
+              fn.with(options)[functionBuilderSymbol] :
+              new ClientFunctionBuilder(fn, options, { instantiation: methodName, execution: methodName });
 
     return builder.getCommand([]);
 
@@ -71,7 +71,9 @@ export class ClickCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.click;
+        this.type             = TYPE.click;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this.options  = null;
 
@@ -90,7 +92,9 @@ export class RightClickCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.rightClick;
+        this.type             = TYPE.rightClick;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this.options  = null;
 
@@ -109,7 +113,9 @@ export class DoubleClickCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.doubleClick;
+        this.type             = TYPE.doubleClick;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this.options  = null;
 
@@ -128,7 +134,9 @@ export class HoverCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.hover;
+        this.type             = TYPE.hover;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this.options  = null;
 
@@ -147,7 +155,9 @@ export class TypeTextCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.typeText;
+        this.type             = TYPE.typeText;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this.text     = null;
         this.options  = null;
@@ -168,7 +178,9 @@ export class DragCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type        = TYPE.drag;
+        this.type             = TYPE.drag;
+        this.executionContext = obj.executionContext;
+
         this.selector    = null;
         this.dragOffsetX = null;
         this.dragOffsetY = null;
@@ -191,7 +203,8 @@ export class DragToElementCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type = TYPE.dragToElement;
+        this.type             = TYPE.dragToElement;
+        this.executionContext = obj.executionContext;
 
         this.selector            = null;
         this.destinationSelector = null;
@@ -213,7 +226,9 @@ export class SelectTextCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.selectText;
+        this.type             = TYPE.selectText;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this.startPos = null;
         this.endPos   = null;
@@ -236,7 +251,9 @@ export class SelectEditableContentCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type          = TYPE.selectEditableContent;
+        this.type             = TYPE.selectEditableContent;
+        this.executionContext = obj.executionContext;
+
         this.startSelector = null;
         this.endSelector   = null;
         this.options       = null;
@@ -257,7 +274,9 @@ export class SelectTextAreaContentCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type      = TYPE.selectTextAreaContent;
+        this.type             = TYPE.selectTextAreaContent;
+        this.executionContext = obj.executionContext;
+
         this.selector  = null;
         this.startLine = null;
         this.startPos  = null;
@@ -284,7 +303,9 @@ export class PressKeyCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type    = TYPE.pressKey;
+        this.type             = TYPE.pressKey;
+        this.executionContext = obj.executionContext;
+
         this.keys    = '';
         this.options = null;
 
@@ -303,7 +324,9 @@ export class NavigateToCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type          = TYPE.navigateTo;
+        this.type             = TYPE.navigateTo;
+        this.executionContext = obj.executionContext;
+
         this.url           = null;
         this.stateSnapshot = null;
 
@@ -322,7 +345,8 @@ export class SetFilesToUploadCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type = TYPE.setFilesToUpload;
+        this.type             = TYPE.setFilesToUpload;
+        this.executionContext = obj.executionContext;
 
         this.selector = null;
         this.filePath = '';
@@ -332,7 +356,7 @@ export class SetFilesToUploadCommand extends Assignable {
 
     _getAssignableProperties () {
         return [
-            { name: 'selector', init: (name, val) => initSelector(name, val, true), required: true },
+            { name: 'selector', init: (name, val, obj) => initSelector(name, val, obj, true), required: true },
             { name: 'filePath', type: stringOrStringArrayArgument, required: true }
         ];
     }
@@ -342,7 +366,8 @@ export class ClearUploadCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type = TYPE.clearUpload;
+        this.type             = TYPE.clearUpload;
+        this.executionContext = obj.executionContext;
 
         this.selector = null;
 
@@ -351,7 +376,7 @@ export class ClearUploadCommand extends Assignable {
 
     _getAssignableProperties () {
         return [
-            { name: 'selector', init: (name, val) => initSelector(name, val, true), required: true }
+            { name: 'selector', init: (name, val, obj) => initSelector(name, val, obj, true), required: true }
         ];
     }
 }
@@ -360,7 +385,9 @@ export class SwitchToIframeCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.switchToIframe;
+        this.type             = TYPE.switchToIframe;
+        this.executionContext = obj.executionContext;
+
         this.selector = null;
         this._assignFrom(obj, true);
     }
@@ -382,7 +409,9 @@ export class SetNativeDialogHandlerCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type          = TYPE.setNativeDialogHandler;
+        this.type             = TYPE.setNativeDialogHandler;
+        this.executionContext = obj.executionContext;
+
         this.dialogHandler = {};
 
         this._assignFrom(obj, true);
@@ -411,7 +440,9 @@ export class SetTestSpeedCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type  = TYPE.setTestSpeed;
+        this.type             = TYPE.setTestSpeed;
+        this.executionContext = obj.executionContext;
+
         this.speed = null;
 
         this._assignFrom(obj, true);
@@ -428,7 +459,9 @@ export class SetPageLoadTimeoutCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type     = TYPE.setPageLoadTimeout;
+        this.type             = TYPE.setPageLoadTimeout;
+        this.executionContext = obj.executionContext;
+
         this.duration = null;
 
         this._assignFrom(obj, true);
@@ -445,7 +478,9 @@ export class UseRoleCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type = TYPE.useRole;
+        this.type             = TYPE.useRole;
+        this.executionContext = obj.executionContext;
+
         this.role = null;
 
         this._assignFrom(obj, true);

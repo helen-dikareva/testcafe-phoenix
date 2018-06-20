@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<input id="hidden-input" style="visibility: hidden"/>
+<input id="file-input" type="file" style="visibility: hidden"/>
+
+<button id="show">Show input</button>
+<button id="create">Create input</button>
+
+<script>
+    var hiddenInput = document.getElementById('hidden-input');
+
+    document.getElementById('show').addEventListener('click', function () {
+        window.setTimeout(function () {
+            hiddenInput.style.visibility = 'visible';
+        }, 1000);
+    });
+
+    hiddenInput.addEventListener('click', function () {
+        throw Error('Input was clicked!');
+    });
+
+    document.getElementById('create').addEventListener('click', function () {
+        window.setTimeout(function () {
+            var input = document.createElement('input');
+
+            input.setAttribute('id', 'input');
+            input.setAttribute('value', 'input value');
+            input.setAttribute('data-test', 'input data attr');
+
+            document.body.appendChild(input);
+        }, 2000);
+    });
+</script>
+</body>
+</html>

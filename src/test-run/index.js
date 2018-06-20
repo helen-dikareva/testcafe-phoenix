@@ -10,6 +10,7 @@ import TestRunDebugLog from './debug-log';
 import TestRunErrorFormattableAdapter from '../errors/test-run/formattable-adapter';
 import TestCafeErrorList from '../errors/error-list';
 import { executeJsExpression } from './execute-js-expression';
+import createExecutionContext from './create-execution-context';
 import { PageLoadError, RoleSwitchInRoleInitializerError } from '../errors/test-run/';
 import BrowserManipulationQueue from './browser-manipulation-queue';
 import CLIENT_MESSAGES from './client-messages';
@@ -82,6 +83,8 @@ export default class TestRun extends Session {
         this.controller = null;
         this.ctx        = Object.create(null);
         this.fixtureCtx = null;
+
+        this.executionContext = createExecutionContext(this);
 
         this.currentRoleId  = null;
         this.usedRoleStates = Object.create(null);
@@ -269,7 +272,7 @@ export default class TestRun extends Session {
 
     _evaluate (code) {
         try {
-            return executeJsExpression(code, false, this);
+            return executeJsExpression(code, this.executionContext);
         }
         catch (err) {
             return { err };
@@ -419,7 +422,8 @@ export default class TestRun extends Session {
 
     // Execute command
     async _executeAssertion (command, callsite) {
-        var assertionTimeout = command.options.timeout === void 0 ? this.opts.assertionTimeout : command.options.timeout;
+        var assertionTimeout = command.options.timeout ===
+                               void 0 ? this.opts.assertionTimeout : command.options.timeout;
         var executor         = new AssertionExecutor(command, assertionTimeout, callsite);
 
         executor.once('start-assertion-retries', timeout => this._enqueueCommand(new ShowAssertionRetriesStatusCommand(timeout)));
@@ -481,6 +485,9 @@ export default class TestRun extends Session {
 
         if (isBrowserManipulationCommand(command))
             this.browserManipulationQueue.push(command);
+
+        if (command.type === COMMAND_TYPE.testCode)
+            return await this._evaluate(command.code, true);
 
         if (command.type === COMMAND_TYPE.wait)
             return delay(command.timeout);

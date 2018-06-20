@@ -604,7 +604,7 @@ gulp.task('test-functional-travis-mobile', ['build'], function () {
     return testFunctional('test/functional/fixtures', functionalTestConfig.testingEnvironmentNames.mobileBrowsers, functionalTestConfig.browserProviderNames.browserstack);
 });
 
-gulp.task('test-functional-local', ['build'], function () {
+gulp.task('test-functional-local', ['fast-build'], function () {
     return testFunctional('test/functional/fixtures', functionalTestConfig.testingEnvironmentNames.localBrowsers);
 });
 

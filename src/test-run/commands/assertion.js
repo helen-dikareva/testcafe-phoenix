@@ -14,10 +14,10 @@ function initAssertionOptions (name, val) {
 }
 
 //Initializers
-function initAssertionParameter (name, val, skipVisibilityCheck) {
+function initAssertionParameter (name, val, { executionContext }) {
     try {
         if (isJSExpression(val))
-            val = executeJsExpression(val.value, skipVisibilityCheck);
+            val = executeJsExpression(val.value, executionContext);
 
         return val;
     }
@@ -33,7 +33,8 @@ export default class AssertionCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type = TYPE.assertion;
+        this.type             = TYPE.assertion;
+        this.executionContext = obj.executionContext;
 
         this.assertionType = null;
         this.actual        = void 0;

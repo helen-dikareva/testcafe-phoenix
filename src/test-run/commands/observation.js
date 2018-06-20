@@ -75,3 +75,23 @@ export class DebugCommand {
     }
 }
 
+export class TestCodeCommand extends Assignable {
+    constructor (obj) {
+        super(obj);
+
+        this.type = TYPE.testCode;
+        this.code = '';
+
+        this._assignFrom(obj, false);
+    }
+
+    _getAssignableProperties () {
+        return [
+            { name: 'code' }
+        ];
+    }
+}
+
+
+
+

@@ -6,13 +6,13 @@ import { executeJsExpression } from '../../execute-js-expression';
 import { isJSExpression } from '../utils';
 
 
-export function initSelector (name, val, skipVisibilityCheck) {
+export function initSelector (name, val, { executionContext }, skipVisibilityCheck) {
     if (val instanceof ExecuteSelectorCommand)
         return val;
 
     try {
         if (isJSExpression(val))
-            val = executeJsExpression(val.value, skipVisibilityCheck);
+            val = executeJsExpression(val.value, executionContext);
 
         var builder = new SelectorBuilder(val, { visibilityCheck: !skipVisibilityCheck }, { instantiation: 'Selector' });
 

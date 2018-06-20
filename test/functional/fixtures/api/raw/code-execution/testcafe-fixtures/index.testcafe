@@ -1,0 +1,124 @@
+{
+    "fixtures": [
+        {
+            "name": "Assigning Variables",
+            "pageUrl": "http://localhost:3000/fixtures/api/raw/code-execution/pages/index.html",
+            "tests": [
+                {
+                    "name": "Use server string variable in assertion",
+                    "commands": [
+                        {
+                            "type": "test-code",
+                            "code": "let a = '123';"
+                        },
+                        {
+                            "type": "click",
+                            "selector": "body"
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "eql",
+                            "actual": { "type" : "js-expr", "value" : "a" },
+                            "expected": "abc"
+                        }
+                    ]
+                },
+                {
+                    "name": "Use selector variable in action",
+                    "commands": [
+                        {
+                            "type": "test-code",
+                            "code": "let el = Selector(() => document.getElementById('hidden-input'))"
+                        },
+                        {
+                            "type": "click",
+                            "selector": {
+                                "type": "js-expr",
+                                "value": "Selector('#show')"
+                            }
+                        },
+                        {
+                            "type": "click",
+                            "selector": {
+                                "type": "js-expr",
+                                "value": "el"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Use selector variable property in assertion",
+                    "commands": [
+                        {
+                            "type": "test-code",
+                            "code": "let el = Selector('#input')"
+                        },
+                        {
+                            "type": "click",
+                            "selector": {
+                                "type": "js-expr",
+                                "value": "Selector('#create')"
+                            }
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "eql",
+                            "actual": { "type" : "js-expr", "value" : "el.value" },
+                            "expected": "input value"
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "eql",
+                            "actual": { "type" : "js-expr", "value" : "el.value" },
+                            "expected": "abc"
+                        }
+                    ]
+                },
+                {
+                    "name": "Use selector variable method in assertion",
+                    "commands": [
+                        {
+                            "type": "test-code",
+                            "code": "let el = Selector('#input')"
+                        },
+                        {
+                            "type": "click",
+                            "selector": {
+                                "type": "js-expr",
+                                "value": "Selector('#create')"
+                            }
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "ok",
+                            "actual": { "type" : "js-expr", "value" : "el.hasAttribute('data-test')" }
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "eql",
+                            "actual": { "type" : "js-expr", "value" : "el.getAttribute('data-test')" },
+                            "expected": "abc"
+                        }
+                    ]
+                },
+                {
+                    "name": "Visibility check",
+                    "commands": [
+                        {
+                           "type": "test-code",
+                           "code": "let getElementById = Selector(id => document.getElementById(id)); let el = Selector(getElementById('file-input'), { visibilityCheck: true });"
+                        },
+                        {
+                            "type": "set-files-to-upload",
+                            "selector": {
+                                "type": "js-expr",
+                                "value": "el"
+                            },
+                            "filePath": "../test-data/test.txt"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
