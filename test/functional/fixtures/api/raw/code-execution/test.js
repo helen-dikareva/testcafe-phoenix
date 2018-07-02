@@ -8,7 +8,7 @@ var RUN_CONFIG = {
 };
 
 // NOTE: we run tests in chrome only, because we mainly test server API functionality.
-describe.only('[Raw API] test server side code execution', function () {
+describe('[Raw API] test server side code execution', function () {
     it('Should execute test with server var', function () {
         return runTests('./testcafe-fixtures/index.testcafe', 'Use server string variable in assertion', RUN_CONFIG)
             .catch(function (errs) {
@@ -37,10 +37,20 @@ describe.only('[Raw API] test server side code execution', function () {
             });
     });
 
-    it.only('Should ', function () {
-        return runTests('./testcafe-fixtures/index.testcafe', 'Visibility check', RUN_CONFIG)
+    it('Should work correctly with visibilityCheck option for actions', function () {
+        return runTests('./testcafe-fixtures/index.testcafe', 'Check element visibility for actions', RUN_CONFIG)
             .catch(function (errs) {
-                errorInEachBrowserContains(errs, 'Input was clicked!', 0);
+                errorInEachBrowserContains(errs, 'The element that matches the specified selector is not visible. ', 0);
+                errorInEachBrowserContains(errs, '[[Click action callsite]]', 0);
+            });
+    });
+
+    it.only('Should work correctly with visibilityCheck option for assertions', function () {
+        return runTests('./testcafe-fixtures/index.testcafe', 'Check element visibility for assertions', RUN_CONFIG)
+            .catch(function (errs) {
+                console.log(errs);
+                errorInEachBrowserContains(errs, 'The element that matches the specified selector is not visible. ', 0);
+                errorInEachBrowserContains(errs, '[[Click action callsite]]', 0);
             });
     });
 });

@@ -14,9 +14,8 @@ export default class RawTestFileCompiler extends TestFileCompilerBase {
                 var callsite   = commandObj && commandObj.callsite;
                 var command    = null;
 
-                commandObj.executionContext = t.testRun.executionContext;
+                //commandObj.codeExecutor = t.testRun.codeExecutor;
 
-                debugger;
                 try {
                     command = createCommandFromObject(commandObj);
 

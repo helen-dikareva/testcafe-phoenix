@@ -5,6 +5,7 @@ import { APIError } from '../../errors/runtime';
 import { AssertionExecutableArgumentError } from '../../errors/test-run';
 import { executeJsExpression } from '../execute-js-expression';
 import { isJSExpression } from './utils';
+import {execute} from '../code-executor';
 
 import { stringArgument, actionOptions, nonEmptyStringArgument } from './validations/argument';
 
@@ -14,10 +15,10 @@ function initAssertionOptions (name, val) {
 }
 
 //Initializers
-function initAssertionParameter (name, val, { executionContext }) {
+function initAssertionParameter (name, val ) {
     try {
         if (isJSExpression(val))
-            val = executeJsExpression(val.value, executionContext);
+            val = execute(val.value);
 
         return val;
     }
@@ -33,8 +34,7 @@ export default class AssertionCommand extends Assignable {
     constructor (obj) {
         super(obj);
 
-        this.type             = TYPE.assertion;
-        this.executionContext = obj.executionContext;
+        this.type         = TYPE.assertion;
 
         this.assertionType = null;
         this.actual        = void 0;

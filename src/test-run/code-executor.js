@@ -2,9 +2,9 @@ import { createContext, runInContext, Script, runInNewContext } from 'vm';
 import SelectorBuilder from '../client-functions/selectors/selector-builder';
 import ClientFunctionBuilder from '../client-functions/client-function-builder';
 
-export default class CodeExecutor {
-    constructor (testRun) {
-        this.testRun             = testRun;
+export class CodeExecutor {
+    constructor () {
+        this.testRun             = null;
         this.skipVisibilityCheck = false;
 
         this.context = this.createContext();
@@ -37,10 +37,23 @@ export default class CodeExecutor {
         return createContext(sandbox);
     }
 
-    execute (code, skipVisibilityCheck) {
+    execute (code, skipVisibilityCheck, testRun) {
+        this.testRun             = testRun || null;
         this.skipVisibilityCheck = skipVisibilityCheck;
 
         return runInNewContext(code, this.context, { displayErrors: false });
     }
-
 }
+
+let codeExecutor = null;
+
+export function createNewExecutor () {
+    debugger;
+    codeExecutor = new CodeExecutor();
+}
+
+export function execute (code, skipVisibilityCheck, testRun) {
+    return codeExecutor.execute(code, skipVisibilityCheck, testRun);
+}
+
+

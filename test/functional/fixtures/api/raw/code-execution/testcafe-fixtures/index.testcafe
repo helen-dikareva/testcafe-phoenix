@@ -102,7 +102,7 @@
                     ]
                 },
                 {
-                    "name": "Visibility check",
+                    "name": "Check element visibility for actions",
                     "commands": [
                         {
                            "type": "test-code",
@@ -114,7 +114,45 @@
                                 "type": "js-expr",
                                 "value": "el"
                             },
-                            "filePath": "../test-data/test.txt"
+                            "filePath": "../test-data/test.txt",
+                            "callsite": "[[Upload action callsite]]"
+                        },
+                        {
+                           "type": "test-code",
+                           "code": "let el = Selector('#file-input', { visibilityCheck: false });"
+                        },
+                        {
+                           "type": "click",
+                           "selector": {
+                               "type": "js-expr",
+                               "value": "el"
+                           },
+                           "callsite": "[[Click action callsite]]"
+                        }
+                    ]
+                },
+                {
+                    "name": "Check element visibility for assertions",
+                    "commands": [
+                        {
+                           "type": "test-code",
+                           "code": "let el = Selector('#hidden-input');"
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "ok",
+                            "actual": { "type" : "js-expr", "value" : "el.offsetWidth" },
+                            "callsite": "[[Assertion without visibility checking callsite]]"
+                        },
+                        {
+                           "type": "test-code",
+                           "code": "let el = Selector('#hidden-input', {visibilityCheck: true});"
+                        },
+                        {
+                            "type": "assertion",
+                            "assertionType": "ok",
+                            "actual": { "type" : "js-expr", "value" : "el.offsetWidth" },
+                            "callsite": "[[Assertion with visibility checking callsite]]"
                         }
                     ]
                 }

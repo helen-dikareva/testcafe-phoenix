@@ -11,6 +11,7 @@ import TestRunErrorFormattableAdapter from '../errors/test-run/formattable-adapt
 import TestCafeErrorList from '../errors/error-list';
 import { executeJsExpression } from './execute-js-expression';
 import createExecutionContext from './create-execution-context';
+import {createNewExecutor, execute } from './code-executor';
 import { PageLoadError, RoleSwitchInRoleInitializerError } from '../errors/test-run/';
 import BrowserManipulationQueue from './browser-manipulation-queue';
 import CLIENT_MESSAGES from './client-messages';
@@ -84,8 +85,6 @@ export default class TestRun extends Session {
         this.ctx        = Object.create(null);
         this.fixtureCtx = null;
 
-        this.executionContext = createExecutionContext(this);
-
         this.currentRoleId  = null;
         this.usedRoleStates = Object.create(null);
 
@@ -113,6 +112,8 @@ export default class TestRun extends Session {
         this.injectable.styles.push('/testcafe-ui-styles.css');
 
         this.requestHooks = Array.from(this.test.requestHooks);
+
+        createNewExecutor();
 
         this._initRequestHooks();
     }
@@ -272,7 +273,7 @@ export default class TestRun extends Session {
 
     _evaluate (code) {
         try {
-            return executeJsExpression(code, this.executionContext);
+            return execute(code, true, this);
         }
         catch (err) {
             return { err };
@@ -487,7 +488,7 @@ export default class TestRun extends Session {
             this.browserManipulationQueue.push(command);
 
         if (command.type === COMMAND_TYPE.testCode)
-            return await this._evaluate(command.code, true);
+            return await this._evaluate(command.code);
 
         if (command.type === COMMAND_TYPE.wait)
             return delay(command.timeout);
