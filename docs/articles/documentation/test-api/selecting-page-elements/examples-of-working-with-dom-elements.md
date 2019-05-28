@@ -97,7 +97,7 @@ For instance, you are testing the *example.html* page with the following HTML co
 </html>
 ```
 
-... and you need to obtain the text content of the first child node - *This is my tested page*. You can do this within a client function using the [childNodes](https://developer.mozilla.org/en-US/docs/Web/API/Node/childNodes) property. The following sample demonstrates this.
+... and you need to obtain the text content of the first child node - *This is my tested page*. You can do this within a selector using the [childNodes](https://developer.mozilla.org/en-US/docs/Web/API/Node/childNodes) property. The following sample demonstrates this.
 
 ```js
 import { Selector } from 'testcafe';
